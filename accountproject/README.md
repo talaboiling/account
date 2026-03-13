@@ -1,70 +1,219 @@
-# Getting Started with Create React App
+# ЛабКонтроль — CRM для лабораторных организаций
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Веб-приложение для автоматизации процесса от заявки клиента до финального заключения лабораторной организации.
 
-## Available Scripts
+---
 
-In the project directory, you can run:
+## Быстрый старт
 
-### `npm start`
+```bash
+cd lab-crm
+npm install
+npm start
+```
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+Приложение откроется на `http://localhost:3000`
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+---
 
-### `npm test`
+## Демо-аккаунты
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+| Роль            | Email               | Пароль      |
+|-----------------|---------------------|-------------|
+| Администратор   | admin@lab.ru        | Admin123!   |
+| Администратор 2 | admin2@lab.ru       | Admin456!   |
+| Лаборант 1      | manager1@lab.ru     | Mgr123!     |
+| Лаборант 2      | manager2@lab.ru     | Mgr456!     |
+| Лаборант 3      | manager3@lab.ru     | Mgr789!     |
+| Клиент 1        | client1@mail.ru     | Client123!  |
+| Клиент 2        | client2@mail.ru     | Client456!  |
 
-### `npm run build`
+---
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Структура проекта
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+```
+src/
+├── index.js                    # Точка входа
+├── index.css                   # Глобальные стили (dark theme, CSS variables)
+├── App.jsx                     # Роутинг + ProtectedRoute
+│
+├── data/
+│   └── store.js                # Центральное in-memory хранилище
+│                               # (вся бизнес-логика, seed-данные, мутации)
+│
+├── context/
+│   └── StoreContext.js         # React Context для реактивного обновления UI
+│
+├── components/
+│   ├── ui.jsx                  # Переиспользуемые UI-компоненты:
+│   │                           #   Button, Badge, StatusBadge, Card
+│   │                           #   Input, Select, Textarea
+│   │                           #   Modal, Table, Tabs
+│   │                           #   PageHeader, InfoRow, EmptyState, Spinner
+│   └── layout/
+│       └── Layout.jsx          # Sidebar + навигация (role-aware) + мобильный header
+│
+└── pages/
+    ├── LoginPage.jsx           # Вход в систему + демо-аккаунты
+    ├── RegisterPage.jsx        # Регистрация клиента + email-верификация (OTP)
+    ├── DashboardPage.jsx       # Главная — статистика и последние заявки (3 версии по роли)
+    ├── ProgramsPage.jsx        # Список 10 программ (только клиент)
+    ├── ApplicationFormPage.jsx # Динамическая форма заявки по программе
+    ├── ApplicationsPage.jsx    # Список заявок (поиск, фильтры по статусу)
+    ├── ApplicationDetailPage.jsx # Детальная страница заявки + весь workflow
+    ├── ProtocolsPage.jsx       # Список протоколов испытаний
+    ├── ResultsPage.jsx         # Список итоговых заключений
+    ├── NotificationsPage.jsx   # Центр уведомлений
+    ├── ArchivePage.jsx         # Общий журнал событий системы
+    └── UsersPage.jsx           # Управление пользователями (только admin)
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+---
 
-### `npm run eject`
+## Бизнес-процесс (Workflow)
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+```
+Клиент                    Администратор             Лаборант
+  │                            │                        │
+  ├─ Регистрация               │                        │
+  ├─ Выбор программы           │                        │
+  ├─ Заполнение формы          │                        │
+  ├─ Подача заявки ──────────► ║ Уведомление            │
+  │                            ║                        │
+  │                            ╠═ Рассмотрение          │
+  │                            ╠═ Назначение лаборанта ─►║
+  ◄──────── Уведомление ═══════╣ Подписать/Отклонить    ║
+  │                            │                        ║
+  │                            │                        ║ Проведение
+  │                            │                        ║ исследования
+  │                            ◄── Уведомление ═════════╣ Создание протокола
+  │                            │                        │
+  │                            ╠═ Отправка протокола    │
+  ◄──────── Уведомление ═══════╣ клиенту                │
+  ║                            │                        │
+  ║ Подтверждение ─────────────►│                        │
+  │                            ║                        │
+  │                            ╠═ Создание заключения   │
+  ◄──────── Уведомление ═══════╣ Отправка клиенту       │
+  ║                            │                        │
+  ║ Подтверждение получения ───►│                        │
+  │                            │                        │
+  ✓ ПРОЦЕСС ЗАВЕРШЁН           │                        │
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+---
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## Роли и права доступа
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+### Администратор (`admin`)
+- Полный доступ ко всем заявкам
+- Подписание / отклонение заявок
+- Назначение лаборантов на заявки
+- Отправка протоколов клиентам
+- Создание итоговых заключений
+- Управление пользователями
+- Доступ к архиву / журналу
 
-## Learn More
+### Лаборант (`manager`)
+- Видит назначенные ему заявки + все ожидающие
+- Создание протоколов испытаний
+- Уведомление администраторов
+- Доступ к своим протоколам
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### Клиент (`client`)
+- Регистрация с email-верификацией
+- Подача заявок по программам
+- Просмотр только своих заявок
+- Получение и подтверждение протоколов
+- Получение и подтверждение заключений
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+---
 
-### Code Splitting
+## 10 Программ обследований
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+| Код | Программа |
+|-----|-----------|
+| СЭЭ | Санитарно-эпидемиологическая экспертиза |
+| ПК  | Производственный контроль |
+| ПП  | Проверка пищевых продуктов |
+| АВ  | Анализ воды и водных ресурсов |
+| ОКО | Обследование коммунальных объектов |
+| РО  | Радиологическое обследование |
+| ТА  | Токсикологический анализ |
+| МИ  | Микробиологические исследования |
+| ЭМ  | Экологический мониторинг |
+| ОУТ | Оценка условий труда |
 
-### Analyzing the Bundle Size
+Каждая программа имеет уникальный набор полей формы (6 полей на программу).
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+---
 
-### Making a Progressive Web App
+## Архитектурные решения
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+### Хранилище (store.js)
+Сейчас — in-memory singleton. Для перехода на реальный бэкенд:
+- Замените методы `store.*` на `async` функции с `fetch()`
+- Контекст подписки (`subscribe/notify`) замените на React Query или SWR
+- Аутентификацию реализуйте через JWT + cookies
 
-### Advanced Configuration
+### Подключение бэкенда
+```js
+// Пример замены store.submitApplication на API-вызов:
+async submitApplication(clientId, programId, formData) {
+  const res = await fetch('/api/applications', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ clientId, programId, formData })
+  });
+  return res.json();
+}
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+### Рекомендуемый стек бэкенда
+- **Node.js** + Express / Fastify
+- **PostgreSQL** (основная БД)
+- **Redis** (сессии, уведомления в реальном времени через WebSocket)
+- **Nodemailer** (email-уведомления)
+- **Socket.io** (live-обновления статусов)
 
-### Deployment
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+## Уведомления
 
-### `npm run build` fails to minify
+Типы уведомлений:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+| Тип | Получатель | Триггер |
+|-----|-----------|---------|
+| `application_submitted` | Администраторы | Клиент подал заявку |
+| `status_changed` | Клиент | Статус заявки изменён |
+| `manager_assigned` | Лаборант | Назначен на заявку |
+| `protocol_ready` | Администраторы | Лаборант создал протокол |
+| `protocol_sent` | Клиент | Протокол отправлен |
+| `protocol_delivered` | Администраторы | Клиент подтвердил протокол |
+| `result_sent` | Клиент | Заключение готово |
+
+---
+
+## Разработка и расширение
+
+### Добавление новой программы
+1. В `src/data/store.js` добавьте объект в массив `PROGRAMS`
+2. Добавьте описание полей формы в объект `PROGRAM_FORMS`
+
+### Добавление новой роли
+1. Добавьте навигацию в `Layout.jsx` (объект `ROLE_NAV`)
+2. Добавьте проверку прав в `ProtectedRoute` в `App.jsx`
+3. Создайте соответствующие страницы
+
+### Кастомизация темы
+Все цвета — в CSS-переменных в `src/index.css`:
+```css
+:root {
+  --accent: #4f8ef7;    /* Основной акцент */
+  --green: #3cc98a;     /* Успех */
+  --yellow: #f5c542;    /* Предупреждение */
+  --red: #f75959;       /* Ошибка */
+  --purple: #a47fff;    /* Протоколы / лаборант */
+}
+```
