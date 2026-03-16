@@ -5,109 +5,104 @@ import { useNavigate } from 'react-router-dom';
 import { PageHeader, Badge, Tabs, StatusBadge } from '../components/ui';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import '../styles/pages.css';
+
+const TYPE_CONFIG = {
+  application:  { icon: '📋', color: 'var(--accent)',  label: 'Заявка',      badgeColor: 'blue'   },
+  protocol:     { icon: '🧪', color: 'var(--purple)', label: 'Протокол',    badgeColor: 'purple' },
+  result:       { icon: '📄', color: 'var(--green)',   label: 'Заключение',  badgeColor: 'green'  },
+  notification: { icon: '🔔', color: 'var(--yellow)',  label: 'Уведомление', badgeColor: 'yellow' },
+};
 
 export default function ArchivePage() {
-  const store = useStore();
-  const user = store.currentUser;
+  const store    = useStore();
   const navigate = useNavigate();
-  const [tab, setTab] = useState('applications');
+  const [tab, setTab] = useState('all');
 
-  // Build a combined log sorted by time
   const allEntries = [
-    ...store.getAllApplications().map(a => ({ type:'application', data:a, time:a.createdAt })),
-    ...store.protocols.map(p => ({ type:'protocol', data:p, time:p.createdAt })),
-    ...store.results.map(r => ({ type:'result', data:r, time:r.createdAt })),
-    ...store.notifications.map(n => ({ type:'notification', data:n, time:n.createdAt })),
-  ].sort((a,b) => new Date(b.time) - new Date(a.time));
+    ...store.getAllApplications().map(a => ({ type: 'application',  data: a, time: a.createdAt })),
+    ...store.protocols.map(p =>           ({ type: 'protocol',     data: p, time: p.createdAt })),
+    ...store.results.map(r =>             ({ type: 'result',       data: r, time: r.createdAt })),
+    ...store.notifications.map(n =>       ({ type: 'notification', data: n, time: n.createdAt })),
+  ].sort((a, b) => new Date(b.time) - new Date(a.time));
 
-  const tabs = [
-    { id:'all', label:'Все события', count: allEntries.length },
-    { id:'applications', label:'Заявки', count: store.getAllApplications().length },
-    { id:'protocols', label:'Протоколы', count: store.protocols.length },
-    { id:'results', label:'Заключения', count: store.results.length },
-    { id:'notifications', label:'Уведомления', count: store.notifications.length },
-  ];
+  const filtered = tab === 'all' ? allEntries : allEntries.filter(e => e.type === tab.replace('s', '').replace('notification', 'notification'));
 
-  const filtered = tab === 'all' ? allEntries : allEntries.filter(e => {
-    if (tab === 'applications') return e.type === 'application';
-    if (tab === 'protocols') return e.type === 'protocol';
-    if (tab === 'results') return e.type === 'result';
-    if (tab === 'notifications') return e.type === 'notification';
-    return true;
-  });
+  const tabMap = { applications: 'application', protocols: 'protocol', results: 'result', notifications: 'notification' };
+  const filteredByTab = tab === 'all' ? allEntries : allEntries.filter(e => e.type === tabMap[tab]);
 
-  const TYPE_CONFIG = {
-    application: { icon:'📋', color:'var(--accent)', label:'Заявка' },
-    protocol: { icon:'🧪', color:'var(--purple)', label:'Протокол' },
-    result: { icon:'📄', color:'var(--green)', label:'Заключение' },
-    notification: { icon:'🔔', color:'var(--yellow)', label:'Уведомление' },
+  const handleClick = (entry) => {
+    if (entry.type === 'application')  navigate(`/applications/${entry.data.id}`);
+    if (entry.type === 'protocol')     navigate(`/applications/${entry.data.applicationId}`);
+    if (entry.type === 'result')       navigate(`/applications/${entry.data.applicationId}`);
   };
 
-  const renderEntry = (entry, i) => {
-    const cfg = TYPE_CONFIG[entry.type];
-    let title = '', sub = '', code = '';
-
+  const getEntryInfo = (entry) => {
     if (entry.type === 'application') {
-      const app = entry.data;
-      const prog = store.getProgramById(app.programId);
-      const client = store.getUserById(app.clientId);
-      title = prog?.name || '—';
-      sub = `Клиент: ${client?.name}`;
-      code = app.sampleCode;
-    } else if (entry.type === 'protocol') {
-      const proto = entry.data;
-      const app = store.applications.find(a => a.id === proto.applicationId);
-      const mgr = store.getUserById(proto.managerId);
-      title = `Протокол по заявке ${app?.sampleCode}`;
-      sub = `Лаборант: ${mgr?.name}`;
-      code = app?.sampleCode;
-    } else if (entry.type === 'result') {
-      const res = entry.data;
-      const app = store.applications.find(a => a.id === res.applicationId);
-      const adm = store.getUserById(res.adminId);
-      title = `Заключение по заявке ${app?.sampleCode}`;
-      sub = `Администратор: ${adm?.name}`;
-      code = app?.sampleCode;
-    } else if (entry.type === 'notification') {
-      title = entry.data.message;
-      sub = `Получатели: ${entry.data.targetIds.length} чел.`;
+      const prog   = store.getProgramById(entry.data.programId);
+      const client = store.getUserById(entry.data.clientId);
+      return { title: prog?.name || '—', sub: `Клиент: ${client?.name}`, code: entry.data.sampleCode };
     }
-
-    const handleClick = () => {
-      if (entry.type === 'application') navigate(`/applications/${entry.data.id}`);
-      else if (entry.type === 'protocol') navigate(`/applications/${entry.data.applicationId}`);
-      else if (entry.type === 'result') navigate(`/applications/${entry.data.applicationId}`);
-    };
-
-    return (
-      <div key={`${entry.type}-${entry.data.id}`} onClick={handleClick} style={{ display:'flex', gap:'12px', alignItems:'flex-start', padding:'13px 16px', background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:'var(--radius-sm)', cursor: entry.type !== 'notification' ? 'pointer' : 'default', transition:'background var(--transition)', animation:`fadeIn 0.2s ease ${(i%20)*0.025}s both` }}
-        onMouseEnter={e => { if(entry.type !== 'notification') e.currentTarget.style.background='var(--bg-hover)'; }}
-        onMouseLeave={e => { e.currentTarget.style.background='var(--bg-card)'; }}>
-        <div style={{ width:'32px', height:'32px', borderRadius:'8px', background:`${cfg.color}15`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.9rem', flexShrink:0 }}>{cfg.icon}</div>
-        <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap' }}>
-            <Badge color={entry.type === 'application' ? 'blue' : entry.type === 'protocol' ? 'purple' : entry.type === 'result' ? 'green' : 'yellow'} style={{ fontSize:'0.68rem' }}>{cfg.label}</Badge>
-            {entry.type === 'application' && <StatusBadge status={entry.data.status} />}
-            {code && <span style={{ fontSize:'0.72rem', color:'var(--text-dim)', fontFamily:'var(--font-main)', fontWeight:700 }}>{code}</span>}
-          </div>
-          <div style={{ fontSize:'0.875rem', fontWeight:500, marginTop:'3px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{title}</div>
-          {sub && <div style={{ fontSize:'0.75rem', color:'var(--text-sub)', marginTop:'1px' }}>{sub}</div>}
-        </div>
-        <div style={{ fontSize:'0.72rem', color:'var(--text-dim)', whiteSpace:'nowrap', flexShrink:0, marginTop:'2px' }}>
-          {format(new Date(entry.time), 'd MMM yyyy HH:mm', { locale:ru })}
-        </div>
-      </div>
-    );
+    if (entry.type === 'protocol') {
+      const app = store.applications.find(a => a.id === entry.data.applicationId);
+      const mgr = store.getUserById(entry.data.managerId);
+      return { title: `Протокол по заявке ${app?.sampleCode}`, sub: `Лаборант: ${mgr?.name}`, code: app?.sampleCode };
+    }
+    if (entry.type === 'result') {
+      const app = store.applications.find(a => a.id === entry.data.applicationId);
+      const adm = store.getUserById(entry.data.adminId);
+      return { title: `Заключение по заявке ${app?.sampleCode}`, sub: `Администратор: ${adm?.name}`, code: app?.sampleCode };
+    }
+    return { title: entry.data.message, sub: `Получатели: ${entry.data.targetIds.length} чел.`, code: null };
   };
 
   return (
-    <div style={{ animation:'fadeIn 0.3s ease' }}>
-      <PageHeader title="Архив / Журнал событий" subtitle="Полная история всех операций системы, отсортированная по времени" />
-      <Tabs tabs={tabs} active={tab} onChange={setTab} />
-      <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
-        {filtered.length === 0 ? (
-          <div style={{ textAlign:'center', padding:'40px', color:'var(--text-sub)' }}>Записей нет</div>
-        ) : filtered.map((entry, i) => renderEntry(entry, i))}
+    <div className="archive-page">
+      <PageHeader title="Архив / Журнал событий"
+        subtitle="Полная история всех операций системы, отсортированная по времени" />
+      <Tabs
+        tabs={[
+          { id: 'all',           label: 'Все события',  count: allEntries.length },
+          { id: 'applications',  label: 'Заявки',       count: allEntries.filter(e => e.type === 'application').length  },
+          { id: 'protocols',     label: 'Протоколы',    count: allEntries.filter(e => e.type === 'protocol').length     },
+          { id: 'results',       label: 'Заключения',   count: allEntries.filter(e => e.type === 'result').length       },
+          { id: 'notifications', label: 'Уведомления',  count: allEntries.filter(e => e.type === 'notification').length },
+        ]}
+        active={tab}
+        onChange={setTab}
+      />
+      <div className="archive-list">
+        {filteredByTab.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-sub)' }}>Записей нет</div>
+        ) : filteredByTab.map((entry, i) => {
+          const cfg  = TYPE_CONFIG[entry.type];
+          const info = getEntryInfo(entry);
+          const clickable = entry.type !== 'notification';
+          return (
+            <div
+              key={`${entry.type}-${entry.data.id}`}
+              onClick={() => handleClick(entry)}
+              className={`archive-item${clickable ? ' archive-item--clickable' : ''}`}
+              style={{ animationDelay: `${(i % 20) * 0.025}s` }}
+            >
+              <div className="archive-item__icon-wrap" style={{ background: `${cfg.color}15` }}>
+                {cfg.icon}
+              </div>
+              <div className="archive-item__body">
+                <div className="archive-item__badges">
+                  <Badge color={cfg.badgeColor} className="badge--xs">{cfg.label}</Badge>
+                  {entry.type === 'application' && <StatusBadge status={entry.data.status} />}
+                  {info.code && <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)', fontFamily: 'var(--font-main)', fontWeight: 700 }}>{info.code}</span>}
+                </div>
+                <div className="archive-item__title">{info.title}</div>
+                {info.sub && <div className="archive-item__sub">{info.sub}</div>}
+              </div>
+              <div className="archive-item__time">
+                {format(new Date(entry.time), 'd MMM yyyy HH:mm', { locale: ru })}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
