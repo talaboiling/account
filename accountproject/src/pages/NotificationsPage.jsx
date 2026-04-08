@@ -3,19 +3,20 @@ import React from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader, Button, EmptyState } from '../components/ui';
-import { formatDistanceToNow } from 'date-fns';
-import { ru } from 'date-fns/locale';
 import '../styles/pages.css';
 
-const NOTIF_ICONS = {
-  application_submitted: '📋',
-  status_changed:        '🔄',
-  manager_assigned:      '👤',
-  protocol_ready:        '🧪',
-  protocol_sent:         '📤',
-  protocol_delivered:    '📬',
-  result_sent:           '📄',
-  default:               '🔔',
+const ICONS = {
+  app_submitted:    '📋',
+  status_changed:   '🔄',
+  draft_sent:       '📄',
+  signed_contract:  '✅',
+  task_assigned:    '📌',
+  work_status:      '⚙️',
+  samples_sent:     '📦',
+  samples_received: '✓',
+  protocol_uploaded:'🔬',
+  finished:         '🏁',
+  default:          '🔔',
 };
 
 export default function NotificationsPage() {
@@ -25,55 +26,59 @@ export default function NotificationsPage() {
   const notifs   = store.getNotificationsForUser(user.id);
   const unread   = notifs.filter(n => !n.read).length;
 
-  const handleClick = (notif) => {
-    store.markNotificationRead(notif.id);
-    if (!notif.relatedId) return;
-    const app    = store.applications.find(a => a.id === notif.relatedId);
-    if (app)    { navigate(`/applications/${app.id}`); return; }
-    const result = store.results.find(r => r.id === notif.relatedId);
-    if (result) { navigate(`/applications/${result.applicationId}`); return; }
-    const proto  = store.protocols.find(p => p.id === notif.relatedId);
-    if (proto)  { navigate(`/applications/${proto.applicationId}`); }
+  const handleClick = n => {
+    store.markNotificationRead(n.id);
+    if (!n.relatedId) return;
+    const app = store.applications.find(a => a.id === n.relatedId);
+    if (app) navigate(`/applications/${app.id}`);
+  };
+
+  const fmt = date => {
+    const d = new Date(date);
+    const now = new Date();
+    const diff = Math.floor((now - d) / 1000);
+    if (diff < 60)   return 'только что';
+    if (diff < 3600) return `${Math.floor(diff/60)} мин. назад`;
+    if (diff < 86400)return `${Math.floor(diff/3600)} ч. назад`;
+    return d.toLocaleDateString('ru-RU', { day:'numeric', month:'short', year:'numeric' });
   };
 
   return (
-    <div className="notifs-page">
+    <div className="fade-in">
       <PageHeader
         title="Уведомления"
         subtitle={unread > 0 ? `${unread} непрочитанных` : 'Все прочитаны'}
         actions={unread > 0 && (
           <Button variant="ghost" size="sm" onClick={() => store.markAllRead(user.id)}>
-            ✓ Отметить все как прочитанные
+            ✓ Прочитать все
           </Button>
         )}
       />
+
       {notifs.length === 0 ? (
-        <EmptyState icon="🔔" title="Уведомлений нет"
-          subtitle="Здесь будут появляться все важные события" />
+        <EmptyState icon="🔔" title="Уведомлений нет" subtitle="Здесь будут появляться события по вашим заявкам" />
       ) : (
         <div className="notifs-list">
-          {notifs.map(notif => (
+          {notifs.map(n => (
             <div
-              key={notif.id}
-              onClick={() => handleClick(notif)}
+              key={n.id}
+              onClick={() => handleClick(n)}
               className={[
                 'notif-item',
-                notif.read   ? 'notif-item--read'      : 'notif-item--unread',
-                notif.relatedId ? 'notif-item--clickable' : '',
+                n.read ? 'notif-item--read' : 'notif-item--unread',
+                n.relatedId ? 'notif-item--link' : '',
               ].join(' ')}
             >
-              <div className={`notif-item__avatar ${notif.read ? 'notif-item__avatar--read' : 'notif-item__avatar--unread'}`}>
-                {NOTIF_ICONS[notif.type] || NOTIF_ICONS.default}
+              <div className={`notif-item__avatar${n.read ? '' : ' notif-item__avatar--unread'}`}>
+                {ICONS[n.type] || ICONS.default}
               </div>
               <div className="notif-item__body">
-                <div className={`notif-item__msg${notif.read ? '' : ' notif-item__msg--unread'}`}>
-                  {notif.message}
+                <div className={`notif-item__msg${n.read ? '' : ' notif-item__msg--bold'}`}>
+                  {n.message}
                 </div>
-                <div className="notif-item__time">
-                  {formatDistanceToNow(new Date(notif.createdAt), { addSuffix: true, locale: ru })}
-                </div>
+                <div className="notif-item__time">{fmt(n.createdAt)}</div>
               </div>
-              {!notif.read && <div className="notif-item__dot" />}
+              {!n.read && <div className="notif-item__dot" />}
             </div>
           ))}
         </div>

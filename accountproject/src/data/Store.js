@@ -1,370 +1,356 @@
 // src/data/store.js
-// Central in-memory store simulating a backend database
-
 import { v4 as uuidv4 } from 'uuid';
 
-const PROGRAMS = [
-  { id: 'prog-1', name: 'Санитарно-эпидемиологическая экспертиза', code: 'СЭЭ', icon: '🔬' },
-  { id: 'prog-2', name: 'Производственный контроль', code: 'ПК', icon: '🏭' },
-  { id: 'prog-3', name: 'Проверка пищевых продуктов', code: 'ПП', icon: '🥗' },
-  { id: 'prog-4', name: 'Анализ воды и водных ресурсов', code: 'АВ', icon: '💧' },
-  { id: 'prog-5', name: 'Обследование коммунальных объектов', code: 'ОКО', icon: '🏢' },
-  { id: 'prog-6', name: 'Радиологическое обследование', code: 'РО', icon: '☢️' },
-  { id: 'prog-7', name: 'Токсикологический анализ', code: 'ТА', icon: '⚗️' },
-  { id: 'prog-8', name: 'Микробиологические исследования', code: 'МИ', icon: '🦠' },
-  { id: 'prog-9', name: 'Экологический мониторинг', code: 'ЭМ', icon: '🌿' },
-  { id: 'prog-10', name: 'Оценка условий труда', code: 'ОУТ', icon: '👷' },
-];
+// ─── APPLICATION STATUSES (match sequence diagram steps) ──────────────────
+// draft       → client saved but not submitted
+// submitted   → client submitted, waiting admin review        [step 1]
+// accepted    → admin accepted, notified client               [step 2]
+// draft_sent  → admin attached draft contract to client       [step 3]
+// signed      → client uploaded signed contract               [step 4]
+// active      → admin assigned manager, set active            [steps 5-6]
+// in_progress → manager set work status "в работе"            [step 7a]
+// completed   → manager set work status "завершён"            [step 7b]
+// samples_sent→ admin notified client about sending samples   [step 8]
+// samples_received → client confirmed receipt of samples      [step 9]
+// protocol_uploaded → client uploaded protocol                [step 10]
+// processing  → admin set "обработка протокола"               [step 11]
+// finished    → admin uploaded conclusion+report+certificate  [step 12]
+// rejected    → admin rejected at any early stage
 
-const PROGRAM_FORMS = {
-  'prog-1': [
-    { id: 'org_name', label: 'Наименование организации', type: 'text', required: true },
-    { id: 'org_address', label: 'Адрес объекта', type: 'text', required: true },
-    { id: 'activity_type', label: 'Вид деятельности', type: 'text', required: true },
-    { id: 'inspection_reason', label: 'Основание для экспертизы', type: 'textarea', required: true },
-    { id: 'contact_person', label: 'Контактное лицо', type: 'text', required: true },
-    { id: 'phone', label: 'Телефон', type: 'tel', required: true },
-  ],
-  'prog-2': [
-    { id: 'enterprise_name', label: 'Наименование предприятия', type: 'text', required: true },
-    { id: 'industry', label: 'Отрасль производства', type: 'select', required: true, options: ['Пищевая промышленность','Химическая промышленность','Машиностроение','Строительство','Прочее'] },
-    { id: 'employee_count', label: 'Количество сотрудников', type: 'number', required: true },
-    { id: 'hazard_class', label: 'Класс опасности производства', type: 'select', required: true, options: ['I класс','II класс','III класс','IV класс'] },
-    { id: 'last_inspection', label: 'Дата последней проверки', type: 'date', required: false },
-    { id: 'notes', label: 'Дополнительные сведения', type: 'textarea', required: false },
-  ],
-  'prog-3': [
-    { id: 'product_name', label: 'Наименование продукции', type: 'text', required: true },
-    { id: 'manufacturer', label: 'Производитель', type: 'text', required: true },
-    { id: 'batch_number', label: 'Номер партии', type: 'text', required: true },
-    { id: 'production_date', label: 'Дата производства', type: 'date', required: true },
-    { id: 'sample_quantity', label: 'Количество образцов (кг)', type: 'number', required: true },
-    { id: 'test_type', label: 'Вид испытания', type: 'select', required: true, options: ['Микробиологический','Физико-химический','Органолептический','Комплексный'] },
-    { id: 'storage_conditions', label: 'Условия хранения', type: 'textarea', required: true },
-  ],
-  'prog-4': [
-    { id: 'source_type', label: 'Тип источника воды', type: 'select', required: true, options: ['Централизованное водоснабжение','Скважина','Колодец','Открытый водоём','Иное'] },
-    { id: 'location', label: 'Местоположение источника', type: 'text', required: true },
-    { id: 'usage_purpose', label: 'Цель использования воды', type: 'select', required: true, options: ['Питьевая','Техническая','Сельскохозяйственная','Рекреационная'] },
-    { id: 'sample_volume', label: 'Объём пробы (л)', type: 'number', required: true },
-    { id: 'sampling_date', label: 'Дата отбора пробы', type: 'date', required: true },
-    { id: 'parameters', label: 'Исследуемые показатели', type: 'textarea', required: true },
-  ],
-  'prog-5': [
-    { id: 'object_type', label: 'Тип объекта', type: 'select', required: true, options: ['Жилой дом','Школа','Детский сад','Больница','Торговый центр','Офисное здание','Прочее'] },
-    { id: 'object_address', label: 'Адрес объекта', type: 'text', required: true },
-    { id: 'area_sqm', label: 'Площадь (м²)', type: 'number', required: true },
-    { id: 'occupancy', label: 'Количество посетителей/жильцов', type: 'number', required: true },
-    { id: 'complaint_reason', label: 'Причина обращения', type: 'textarea', required: true },
-    { id: 'urgency', label: 'Срочность', type: 'select', required: true, options: ['Стандартная','Срочная','Экстренная'] },
-  ],
-  'prog-6': [
-    { id: 'object_name', label: 'Наименование объекта', type: 'text', required: true },
-    { id: 'object_address', label: 'Адрес объекта', type: 'text', required: true },
-    { id: 'radiation_source', label: 'Источник излучения', type: 'select', required: true, options: ['Рентгеновское оборудование','Радиоактивные материалы','Естественный фон','Иное'] },
-    { id: 'measurement_area', label: 'Площадь обследования (м²)', type: 'number', required: true },
-    { id: 'reason', label: 'Основание для обследования', type: 'textarea', required: true },
-    { id: 'previous_results', label: 'Результаты предыдущих измерений', type: 'textarea', required: false },
-  ],
-  'prog-7': [
-    { id: 'substance_name', label: 'Наименование вещества/материала', type: 'text', required: true },
-    { id: 'substance_origin', label: 'Происхождение вещества', type: 'text', required: true },
-    { id: 'analysis_type', label: 'Вид анализа', type: 'select', required: true, options: ['Качественный','Количественный','Скрининговый'] },
-    { id: 'sample_form', label: 'Форма образца', type: 'select', required: true, options: ['Жидкость','Порошок','Таблетки','Газ','Твёрдое вещество'] },
-    { id: 'quantity', label: 'Количество образца', type: 'text', required: true },
-    { id: 'suspected_substances', label: 'Предполагаемые токсичные вещества', type: 'textarea', required: false },
-  ],
-  'prog-8': [
-    { id: 'sample_type', label: 'Тип образца', type: 'select', required: true, options: ['Пища','Вода','Воздух','Почва','Биоматериал','Смывы с поверхности'] },
-    { id: 'sampling_location', label: 'Место отбора пробы', type: 'text', required: true },
-    { id: 'sampling_date', label: 'Дата отбора', type: 'date', required: true },
-    { id: 'target_microorganisms', label: 'Определяемые микроорганизмы', type: 'textarea', required: true },
-    { id: 'sample_count', label: 'Количество образцов', type: 'number', required: true },
-    { id: 'storage_temp', label: 'Температура хранения при транспортировке (°C)', type: 'number', required: true },
-  ],
-  'prog-9': [
-    { id: 'monitoring_area', label: 'Район мониторинга', type: 'text', required: true },
-    { id: 'area_size', label: 'Площадь территории (га)', type: 'number', required: true },
-    { id: 'pollution_type', label: 'Тип загрязнения', type: 'select', required: true, options: ['Атмосферный воздух','Почва','Водоёмы','Шумовое загрязнение','Комплексное'] },
-    { id: 'pollution_source', label: 'Источник загрязнения', type: 'text', required: true },
-    { id: 'monitoring_duration', label: 'Период мониторинга (дней)', type: 'number', required: true },
-    { id: 'objectives', label: 'Цели и задачи мониторинга', type: 'textarea', required: true },
-  ],
-  'prog-10': [
-    { id: 'workplace_name', label: 'Наименование рабочего места', type: 'text', required: true },
-    { id: 'department', label: 'Подразделение/отдел', type: 'text', required: true },
-    { id: 'worker_count', label: 'Количество работников на данном месте', type: 'number', required: true },
-    { id: 'work_type', label: 'Вид выполняемых работ', type: 'textarea', required: true },
-    { id: 'hazard_factors', label: 'Имеющиеся вредные факторы', type: 'select', required: true, options: ['Химические','Физические','Биологические','Психофизиологические','Комплекс факторов'] },
-    { id: 'existing_class', label: 'Действующий класс условий труда (если известен)', type: 'select', required: false, options: ['Не установлен','1 (оптимальный)','2 (допустимый)','3.1 (вредный)','3.2 (вредный)','3.3 (вредный)','3.4 (вредный)','4 (опасный)'] },
-  ],
+export const APPLICATION_STATUSES = {
+  submitted:          { label: 'Подана',                    color: 'yellow',  step: 1  },
+  accepted:           { label: 'Принята',                   color: 'blue',    step: 2  },
+  draft_sent:         { label: 'Драфт договора отправлен',  color: 'cyan',    step: 3  },
+  signed:             { label: 'Договор подписан',          color: 'purple',  step: 4  },
+  active:             { label: 'В действии',                color: 'green',   step: 5  },
+  in_progress:        { label: 'В работе',                  color: 'blue',    step: 6  },
+  completed:          { label: 'Работа завершена',          color: 'purple',  step: 7  },
+  samples_sent:       { label: 'Образцы отправлены',        color: 'cyan',    step: 8  },
+  samples_received:   { label: 'Образцы приняты',           color: 'blue',    step: 9  },
+  protocol_uploaded:  { label: 'Протокол прикреплён',       color: 'purple',  step: 10 },
+  processing:         { label: 'Обработка протокола',       color: 'yellow',  step: 11 },
+  finished:           { label: 'Завершено',                 color: 'green',   step: 12 },
+  rejected:           { label: 'Отклонена',                 color: 'red',     step: 0  },
 };
 
-// Initial seed data
-const seedAdmins = [
-  { id: 'admin-1', role: 'admin', email: 'admin@lab.ru', password: 'Admin123!', name: 'Иванов Алексей Петрович', position: 'Главный администратор', phone: '+7 (495) 123-45-67', createdAt: '2024-01-01T08:00:00Z' },
-  { id: 'admin-2', role: 'admin', email: 'admin2@lab.ru', password: 'Admin456!', name: 'Смирнова Елена Викторовна', position: 'Заместитель администратора', phone: '+7 (495) 123-45-68', createdAt: '2024-01-01T08:00:00Z' },
+// ─── PROGRAMS ─────────────────────────────────────────────────────────────
+export const PROGRAMS = [
+  { id: 'p01', code: 'ПК-ХА-01',  name: 'Химический анализ воды',                 icon: '💧' },
+  { id: 'p02', code: 'ПК-МБ-02',  name: 'Микробиологические исследования',         icon: '🦠' },
+  { id: 'p03', code: 'ПК-ПП-03',  name: 'Проверка пищевых продуктов',              icon: '🥗' },
+  { id: 'p04', code: 'ПК-РА-04',  name: 'Радиологическое обследование',            icon: '☢️' },
+  { id: 'p05', code: 'ПК-ЭМ-05',  name: 'Экологический мониторинг',                icon: '🌿' },
+  { id: 'p06', code: 'ПК-ВМ-06',  name: 'Физические измерения (шум, вибрация)',    icon: '📡' },
+  { id: 'p07', code: 'ПК-СЭЭ-07', name: 'Санитарно-эпидемиологическая экспертиза',icon: '🔬' },
+  { id: 'p08', code: 'ПК-ГР-08',  name: 'Анализ грунта и почв',                   icon: '🪨' },
+  { id: 'p09', code: 'ПК-ВЗ-09',  name: 'Анализ воздуха рабочей зоны',            icon: '💨' },
+  { id: 'p10', code: 'ПК-ОУТ-10', name: 'Оценка условий труда',                   icon: '👷' },
 ];
 
-const seedManagers = [
-  { id: 'mgr-1', role: 'manager', email: 'manager1@lab.ru', password: 'Mgr123!', name: 'Петров Дмитрий Сергеевич', position: 'Старший лаборант', specialization: ['prog-1','prog-2','prog-8'], phone: '+7 (495) 234-56-78', createdAt: '2024-01-05T08:00:00Z' },
-  { id: 'mgr-2', role: 'manager', email: 'manager2@lab.ru', password: 'Mgr456!', name: 'Козлова Наталья Ивановна', position: 'Лаборант-химик', specialization: ['prog-3','prog-4','prog-7'], phone: '+7 (495) 234-56-79', createdAt: '2024-01-05T08:00:00Z' },
-  { id: 'mgr-3', role: 'manager', email: 'manager3@lab.ru', password: 'Mgr789!', name: 'Новиков Андрей Александрович', position: 'Эколог-инспектор', specialization: ['prog-5','prog-6','prog-9','prog-10'], phone: '+7 (495) 234-56-80', createdAt: '2024-01-06T08:00:00Z' },
+// ─── SEED USERS ────────────────────────────────────────────────────────────
+const seedUsers = [
+  { id: 'admin-1', role: 'admin',   email: 'admin@csee.kz',    password: 'Admin123!', name: 'Иванов Алексей Петрович',      position: 'Главный администратор',    phone: '+7 (727) 123-45-67', verified: true, createdAt: '2024-01-01T08:00:00Z' },
+  { id: 'admin-2', role: 'admin',   email: 'admin2@csee.kz',   password: 'Admin456!', name: 'Смирнова Елена Викторовна',    position: 'Заместитель администратора',phone: '+7 (727) 123-45-68', verified: true, createdAt: '2024-01-01T08:00:00Z' },
+  { id: 'mgr-1',   role: 'manager', email: 'manager1@csee.kz', password: 'Mgr123!',  name: 'Петров Дмитрий Сергеевич',     position: 'Заведующий лабораторией',  phone: '+7 (727) 234-56-78', verified: true, createdAt: '2024-01-05T08:00:00Z' },
+  { id: 'mgr-2',   role: 'manager', email: 'manager2@csee.kz', password: 'Mgr456!',  name: 'Козлова Наталья Ивановна',     position: 'Старший заведующий',       phone: '+7 (727) 234-56-79', verified: true, createdAt: '2024-01-05T08:00:00Z' },
+  { id: 'client-1',role: 'client',  email: 'client1@lab.kz',   password: 'Client123!',name: 'Захаров Михаил Олегович',     phone: '+7 (701) 111-22-33', orgName: 'ТОО «АналитЛаб»',    verified: true, createdAt: '2024-02-10T10:00:00Z' },
+  { id: 'client-2',role: 'client',  email: 'client2@lab.kz',   password: 'Client456!',name: 'Морозова Светлана Дмитриевна',phone: '+7 (701) 444-55-66', orgName: 'ИП Морозова С.Д.',   verified: true, createdAt: '2024-02-15T11:00:00Z' },
 ];
 
-const seedClients = [
-  { id: 'client-1', role: 'client', email: 'client1@mail.ru', password: 'Client123!', name: 'Захаров Михаил Олегович', phone: '+7 (916) 111-22-33', orgName: 'ООО "ПищеПром"', verified: true, createdAt: '2024-02-10T10:00:00Z' },
-  { id: 'client-2', role: 'client', email: 'client2@mail.ru', password: 'Client456!', name: 'Морозова Светлана Дмитриевна', phone: '+7 (916) 444-55-66', orgName: 'ИП Морозова', verified: true, createdAt: '2024-02-15T11:00:00Z' },
-];
-
+// ─── SEED APPLICATIONS ─────────────────────────────────────────────────────
 const seedApplications = [
   {
-    id: 'app-1', clientId: 'client-1', programId: 'prog-3', status: 'signed',
-    formData: { product_name: 'Молоко пастеризованное 3.2%', manufacturer: 'ООО ПищеПром', batch_number: 'Б-2024-001', production_date: '2024-03-01', sample_quantity: '5', test_type: 'Комплексный', storage_conditions: 'Хранение при t +4°C' },
-    assignedManagerId: 'mgr-2', sampleCode: 'ЛАБ-2024-003-ПП',
-    createdAt: '2024-03-05T09:00:00Z', updatedAt: '2024-03-06T10:00:00Z',
-    adminNote: 'Заявка принята к рассмотрению', protocolReady: true, resultReady: true, protocolDelivered: true,
-    protocolId: 'proto-1', resultId: 'result-1',
+    id: 'app-1',
+    clientId: 'client-1',
+    programId: 'p03',
+    status: 'active',
+    appNumber: 'ЗАЯ-2024-001',
+    formData: {
+      objectName:        'Молочная продукция (молоко пастеризованное)',
+      indicators:        'Органолептические показатели, КМАФАнМ, БГКП, Жирность',
+      measureRange:      'КМАФАнМ: 1×10²–1×10⁶ КОЕ/г; Жирность: 1–6%',
+      normDoc:           'ГОСТ 31450-2013, СанПиН 3.2.3685-21',
+      deptName:          'Лаборатория контроля качества',
+      accreditCert:      'KZ.I.02.1234',
+      headName:          'Захаров Михаил Олегович, руководитель лаборатории',
+      headContact:       'г. Алматы, ул. Промышленная 5; +7 (701) 111-22-33; m.zakharov@analitlab.kz',
+      orgDetails:        'ТОО «АналитЛаб», БИН 123456789012, г. Алматы, ул. Промышленная 5; ИИК KZ11ABCD1234567890; Банк: АО «Казком»; БИК KZKOKZKX',
+      directorName:      'Захаров М.О., директор',
+    },
+    assignedManagerId: 'mgr-1',
+    taskNote: 'Провести проверку квалификации по программе ПК-ПП-03. Срок: 30 дней.',
+    draftContractUrl:  'draft_contract_app1.pdf',
+    signedContractUrl: 'signed_contract_app1.pdf',
+    protocolUrl: null,
+    conclusionUrl: null, reportUrl: null, certificateUrl: null,
+    timeline: [
+      { status: 'submitted',  date: '2024-03-01T09:00:00Z', by: 'client-1',  note: '' },
+      { status: 'accepted',   date: '2024-03-02T10:00:00Z', by: 'admin-1',   note: 'Заявка соответствует требованиям программы.' },
+      { status: 'draft_sent', date: '2024-03-03T11:00:00Z', by: 'admin-1',   note: '' },
+      { status: 'signed',     date: '2024-03-04T14:00:00Z', by: 'client-1',  note: '' },
+      { status: 'active',     date: '2024-03-05T09:00:00Z', by: 'admin-1',   note: 'Задание передано заведующему Петрову Д.С.' },
+    ],
+    createdAt: '2024-03-01T09:00:00Z',
+    updatedAt: '2024-03-05T09:00:00Z',
   },
   {
-    id: 'app-2', clientId: 'client-1', programId: 'prog-8', status: 'pending',
-    formData: { sample_type: 'Смывы с поверхности', sampling_location: 'Производственный цех №2, ул. Промышленная 5', sampling_date: '2024-03-10', target_microorganisms: 'БГКП, S.aureus, Salmonella', sample_count: '10', storage_temp: '4' },
-    assignedManagerId: 'mgr-1', sampleCode: 'ЛАБ-2024-008-МИ',
-    createdAt: '2024-03-10T14:00:00Z', updatedAt: '2024-03-10T14:00:00Z',
-    adminNote: '', protocolReady: false, resultReady: false, protocolDelivered: false,
-  },
-  {
-    id: 'app-3', clientId: 'client-2', programId: 'prog-5', status: 'signed',
-    formData: { object_type: 'Детский сад', object_address: 'ул. Садовая 15, Москва', area_sqm: '850', occupancy: '120', complaint_reason: 'Плановая проверка перед учебным годом', urgency: 'Стандартная' },
-    assignedManagerId: 'mgr-3', sampleCode: 'ЛАБ-2024-005-ОКО',
-    createdAt: '2024-03-08T11:00:00Z', updatedAt: '2024-03-09T09:00:00Z',
-    adminNote: 'Назначен выезд на 15 марта', protocolReady: false, resultReady: false, protocolDelivered: false,
-  },
-];
-
-const seedProtocols = [
-  {
-    id: 'proto-1', applicationId: 'app-1', managerId: 'mgr-2',
-    content: 'Протокол испытаний №ПИ-2024-003\n\nОбразец: Молоко пастеризованное 3.2%\nПроизводитель: ООО ПищеПром\nПартия: Б-2024-001\n\nРезультаты испытаний:\n- Органолептические показатели: соответствуют норме\n- КМАФАнМ: 2,5×10² КОЕ/г (норма ≤1×10⁵)\n- БГКП: не обнаружены\n- Сальмонелла: не обнаружена\n- Жирность: 3.21% (норма 3.2±0.1%)\n\nЗАКЛЮЧЕНИЕ: Образцы соответствуют требованиям ГОСТ 31450-2013.',
-    status: 'delivered', createdAt: '2024-03-15T14:00:00Z',
-  },
-];
-
-const seedResults = [
-  {
-    id: 'result-1', applicationId: 'app-1', adminId: 'admin-1', protocolId: 'proto-1',
-    content: 'ЗАКЛЮЧЕНИЕ №З-2024-003\n\nНа основании протокола испытаний №ПИ-2024-003 и результатов лабораторных исследований:\n\nОбразцы продукции "Молоко пастеризованное 3.2%" производства ООО "ПищеПром" (партия Б-2024-001) СООТВЕТСТВУЮТ требованиям действующей нормативно-технической документации.\n\nВыдано заключение о соответствии продукции санитарным нормам и правилам.',
-    deliveredToClient: true, clientConfirmed: true,
-    createdAt: '2024-03-20T11:00:00Z',
+    id: 'app-2',
+    clientId: 'client-2',
+    programId: 'p01',
+    status: 'submitted',
+    appNumber: 'ЗАЯ-2024-002',
+    formData: {
+      objectName:   'Питьевая вода из централизованного водоснабжения',
+      indicators:   'pH, мутность, цветность, нитраты, нитриты, железо общее',
+      measureRange: 'pH: 6–9; мутность: 0.5–4 ЕМФ; нитраты: 1–50 мг/л',
+      normDoc:      'СанПиН 3.3686-21, ГОСТ Р 51232',
+      deptName:     'Испытательная лаборатория вод',
+      accreditCert: 'Аттестат №RA.RU.21АЛ43',
+      headName:     'Морозова Светлана Дмитриевна, руководитель',
+      headContact:  'г. Алматы, пр. Абая 100; +7 (701) 444-55-66; s.morozova@lab.kz',
+      orgDetails:   'ИП Морозова С.Д., БИН 234567890123, г. Алматы, пр. Абая 100',
+      directorName: 'Морозова С.Д., ИП',
+    },
+    assignedManagerId: null,
+    taskNote: null,
+    draftContractUrl: null, signedContractUrl: null,
+    protocolUrl: null, conclusionUrl: null, reportUrl: null, certificateUrl: null,
+    timeline: [
+      { status: 'submitted', date: '2024-03-10T14:00:00Z', by: 'client-2', note: '' },
+    ],
+    createdAt: '2024-03-10T14:00:00Z',
+    updatedAt: '2024-03-10T14:00:00Z',
   },
 ];
 
 const seedNotifications = [
-  { id: 'notif-1', type: 'application_submitted', targetRoles: ['admin'], targetIds: ['admin-1','admin-2'], relatedId: 'app-1', message: 'Новая заявка от клиента Захаров М.О. по программе "Проверка пищевых продуктов"', read: true, createdAt: '2024-03-05T09:00:00Z' },
-  { id: 'notif-2', type: 'status_changed', targetRoles: ['client'], targetIds: ['client-1'], relatedId: 'app-1', message: 'Статус вашей заявки изменён на "Подписана"', read: true, createdAt: '2024-03-06T10:00:00Z' },
-  { id: 'notif-3', type: 'protocol_ready', targetRoles: ['admin'], targetIds: ['admin-1','admin-2'], relatedId: 'proto-1', message: 'Протокол по заявке №app-1 готов. Лаборант: Козлова Н.И.', read: true, createdAt: '2024-03-15T14:00:00Z' },
-  { id: 'notif-4', type: 'result_sent', targetRoles: ['client'], targetIds: ['client-1'], relatedId: 'result-1', message: 'Результаты по вашей заявке готовы и отправлены', read: true, createdAt: '2024-03-20T11:00:00Z' },
-  { id: 'notif-5', type: 'application_submitted', targetRoles: ['admin','manager'], targetIds: ['admin-1','admin-2','mgr-1'], relatedId: 'app-2', message: 'Новая заявка от клиента Захаров М.О. по программе "Микробиологические исследования"', read: false, createdAt: '2024-03-10T14:00:00Z' },
-  { id: 'notif-6', type: 'application_submitted', targetRoles: ['admin','manager'], targetIds: ['admin-1','admin-2','mgr-3'], relatedId: 'app-3', message: 'Новая заявка от клиента Морозова С.Д. по программе "Обследование коммунальных объектов"', read: false, createdAt: '2024-03-08T11:00:00Z' },
+  { id: 'n1', type: 'app_submitted',  targetIds: ['admin-1','admin-2'], relatedId: 'app-1', message: 'Новая заявка ЗАЯ-2024-001 от ТОО «АналитЛаб»', read: true,  createdAt: '2024-03-01T09:00:00Z' },
+  { id: 'n2', type: 'status_changed', targetIds: ['client-1'],          relatedId: 'app-1', message: 'Статус заявки ЗАЯ-2024-001 изменён: «Принята»',  read: true,  createdAt: '2024-03-02T10:00:00Z' },
+  { id: 'n3', type: 'draft_sent',     targetIds: ['client-1'],          relatedId: 'app-1', message: 'Прикреплён драфт договора по заявке ЗАЯ-2024-001', read: true, createdAt: '2024-03-03T11:00:00Z' },
+  { id: 'n4', type: 'app_submitted',  targetIds: ['admin-1','admin-2'], relatedId: 'app-2', message: 'Новая заявка ЗАЯ-2024-002 от ИП Морозова С.Д.',   read: false, createdAt: '2024-03-10T14:00:00Z' },
 ];
 
-// ---- STORE CLASS ----
+// ─── STORE ─────────────────────────────────────────────────────────────────
 class Store {
   constructor() {
-    this.users = [...seedAdmins, ...seedManagers, ...seedClients];
-    this.applications = [...seedApplications];
-    this.protocols = [...seedProtocols];
-    this.results = [...seedResults];
+    this.users         = [...seedUsers];
+    this.applications  = [...seedApplications];
     this.notifications = [...seedNotifications];
-    this.programs = PROGRAMS;
-    this.programForms = PROGRAM_FORMS;
-    this.currentUser = null;
+    this.programs      = PROGRAMS;
+    this.currentUser   = null;
     this.pendingVerifications = {};
-    this.listeners = [];
+    this._listeners    = [];
+    this._appCounter   = 3;
   }
 
-  subscribe(fn) {
-    this.listeners.push(fn);
-    return () => { this.listeners = this.listeners.filter(l => l !== fn); };
-  }
+  subscribe(fn) { this._listeners.push(fn); return () => { this._listeners = this._listeners.filter(l => l !== fn); }; }
+  notify()      { this._listeners.forEach(fn => fn()); }
 
-  notify() {
-    this.listeners.forEach(fn => fn());
-  }
-
-  // AUTH
+  // ── AUTH ────────────────────────────────────────────────────────────────
   login(email, password) {
-    const user = this.users.find(u => u.email === email && u.password === password);
-    if (!user) return { error: 'Неверный email или пароль' };
-    if (user.role === 'client' && !user.verified) return { error: 'Email не подтверждён. Проверьте почту.' };
-    this.currentUser = user;
+    const u = this.users.find(u => u.email === email && u.password === password);
+    if (!u) return { error: 'Неверный email или пароль' };
+    if (u.role === 'client' && !u.verified) return { error: 'Email не подтверждён' };
+    this.currentUser = u;
     this.notify();
-    return { user };
+    return { user: u };
   }
-
-  logout() {
-    this.currentUser = null;
-    this.notify();
-  }
+  logout() { this.currentUser = null; this.notify(); }
 
   registerClient(data) {
     if (this.users.find(u => u.email === data.email)) return { error: 'Email уже зарегистрирован' };
     const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const id = uuidv4();
-    const user = { id, role: 'client', email: data.email, password: data.password, name: data.name, phone: data.phone || '', orgName: data.orgName || '', verified: false, createdAt: new Date().toISOString() };
+    const user = { id: uuidv4(), role: 'client', ...data, verified: false, createdAt: new Date().toISOString() };
     this.users.push(user);
     this.pendingVerifications[data.email] = code;
     this.notify();
-    return { userId: id, verificationCode: code };
+    return { verificationCode: code };
   }
 
   verifyEmail(email, code) {
-    if (this.pendingVerifications[email] !== code) return { error: 'Неверный код подтверждения' };
-    const user = this.users.find(u => u.email === email);
-    if (user) { user.verified = true; delete this.pendingVerifications[email]; }
+    if (this.pendingVerifications[email] !== code) return { error: 'Неверный код' };
+    const u = this.users.find(u => u.email === email);
+    if (u) { u.verified = true; delete this.pendingVerifications[email]; }
     this.notify();
     return { success: true };
   }
 
-  // APPLICATIONS
+  // ── APPLICATIONS ────────────────────────────────────────────────────────
   submitApplication(clientId, programId, formData) {
-    const program = this.programs.find(p => p.id === programId);
-    const sampleCode = `ЛАБ-${new Date().getFullYear()}-${String(this.applications.length + 1).padStart(3,'0')}-${program.code}`;
-    const app = { id: uuidv4(), clientId, programId, status: 'pending', formData, assignedManagerId: null, sampleCode, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), adminNote: '', protocolReady: false, resultReady: false, protocolDelivered: false };
+    const prog = this.programs.find(p => p.id === programId);
+    const year = new Date().getFullYear();
+    const num  = String(this._appCounter++).padStart(3, '0');
+    const app  = {
+      id: uuidv4(), clientId, programId, status: 'submitted',
+      appNumber: `ЗАЯ-${year}-${num}`,
+      formData,
+      assignedManagerId: null, taskNote: null,
+      draftContractUrl: null, signedContractUrl: null,
+      protocolUrl: null, conclusionUrl: null, reportUrl: null, certificateUrl: null,
+      timeline: [{ status: 'submitted', date: new Date().toISOString(), by: clientId, note: '' }],
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    };
     this.applications.push(app);
-    const client = this.users.find(u => u.id === clientId);
-    const admins = this.users.filter(u => u.role === 'admin');
-    admins.forEach(admin => {
-      this.addNotification({ type: 'application_submitted', targetRoles: ['admin'], targetIds: [admin.id], relatedId: app.id, message: `Новая заявка от ${client?.name} по программе "${program.name}"` });
-    });
+    const client = this.getUserById(clientId);
+    this._notifyAdmins('app_submitted', app.id, `Новая заявка ${app.appNumber} от ${client?.orgName || client?.name}`);
     this.notify();
     return app;
   }
 
-  updateApplicationStatus(appId, status, adminNote, managerId) {
-    const app = this.applications.find(a => a.id === appId);
-    if (!app) return;
-    app.status = status;
-    if (adminNote !== undefined) app.adminNote = adminNote;
-    if (managerId !== undefined) app.assignedManagerId = managerId;
-    app.updatedAt = new Date().toISOString();
-    const statusLabel = status === 'signed' ? 'Подписана' : status === 'rejected' ? 'Отклонена' : 'На рассмотрении';
-    this.addNotification({ type: 'status_changed', targetRoles: ['client'], targetIds: [app.clientId], relatedId: appId, message: `Статус вашей заявки (${app.sampleCode}) изменён на "${statusLabel}"` });
-    this.notify();
+  // Step 2: Admin accepts
+  acceptApplication(appId, adminId, note = '') {
+    this._transition(appId, 'accepted', adminId, note);
+    const app = this.getAppById(appId);
+    this._notifyClient(app, 'status_changed', `Ваша заявка ${app.appNumber} принята к рассмотрению`);
   }
 
-  assignManager(appId, managerId) {
-    const app = this.applications.find(a => a.id === appId);
+  // Step 3: Admin attaches draft contract
+  attachDraftContract(appId, adminId, filename) {
+    const app = this.getAppById(appId);
+    if (!app) return;
+    app.draftContractUrl = filename;
+    this._transition(appId, 'draft_sent', adminId, '');
+    this._notifyClient(app, 'draft_sent', `Прикреплён драфт договора по заявке ${app.appNumber}`);
+  }
+
+  // Step 4: Client uploads signed contract
+  uploadSignedContract(appId, clientId, filename) {
+    const app = this.getAppById(appId);
+    if (!app) return;
+    app.signedContractUrl = filename;
+    this._transition(appId, 'signed', clientId, '');
+    this._notifyAdmins('signed_contract', appId, `Клиент загрузил подписанный договор по заявке ${app.appNumber}`);
+  }
+
+  // Step 5+6: Admin assigns manager + task + sets active
+  assignManagerAndActivate(appId, adminId, managerId, taskNote) {
+    const app = this.getAppById(appId);
     if (!app) return;
     app.assignedManagerId = managerId;
+    app.taskNote = taskNote;
+    this._transition(appId, 'active', adminId, `Задание передано: ${taskNote}`);
+    const mgr = this.getUserById(managerId);
+    this._notifyUser(managerId, 'task_assigned', appId, `Вам назначено задание по заявке ${app.appNumber}`);
+    this._notifyClient(app, 'status_changed', `Заявка ${app.appNumber} перешла в статус «В действии»`);
+  }
+
+  // Step 7: Manager updates work status
+  updateWorkStatus(appId, managerId, workStatus, note = '') {
+    // workStatus: 'in_progress' | 'completed'
+    this._transition(appId, workStatus, managerId, note);
+    const app = this.getAppById(appId);
+    const label = APPLICATION_STATUSES[workStatus]?.label || workStatus;
+    this._notifyAdmins('work_status', appId, `Заведующий обновил статус по заявке ${app.appNumber}: «${label}»`);
+  }
+
+  // Step 8: Admin notifies client about sending samples
+  notifySamplesSent(appId, adminId, note = '') {
+    this._transition(appId, 'samples_sent', adminId, note);
+    const app = this.getAppById(appId);
+    this._notifyClient(app, 'samples_sent', `По заявке ${app.appNumber}: образцы отправлены. Подтвердите получение.`);
+  }
+
+  // Step 9: Client confirms receipt of samples
+  confirmSamplesReceived(appId, clientId) {
+    this._transition(appId, 'samples_received', clientId, '');
+    const app = this.getAppById(appId);
+    this._notifyAdmins('samples_received', appId, `Клиент подтвердил получение образцов по заявке ${app.appNumber}`);
+  }
+
+  // Step 10: Client uploads protocol
+  uploadProtocol(appId, clientId, filename) {
+    const app = this.getAppById(appId);
+    if (!app) return;
+    app.protocolUrl = filename;
+    this._transition(appId, 'protocol_uploaded', clientId, '');
+    this._notifyAdmins('protocol_uploaded', appId, `Клиент прикрепил протокол по заявке ${app.appNumber}`);
+  }
+
+  // Step 11: Admin sets protocol processing status
+  setProcessingStatus(appId, adminId, note = '') {
+    this._transition(appId, 'processing', adminId, note);
+    const app = this.getAppById(appId);
+    this._notifyClient(app, 'status_changed', `По заявке ${app.appNumber}: протокол принят в обработку`);
+  }
+
+  // Step 12: Admin uploads final documents
+  uploadFinalDocuments(appId, adminId, { conclusionUrl, reportUrl, certificateUrl }) {
+    const app = this.getAppById(appId);
+    if (!app) return;
+    if (conclusionUrl)   app.conclusionUrl  = conclusionUrl;
+    if (reportUrl)       app.reportUrl      = reportUrl;
+    if (certificateUrl)  app.certificateUrl = certificateUrl;
+    this._transition(appId, 'finished', adminId, '');
+    this._notifyClient(app, 'finished', `По заявке ${app.appNumber} прикреплены заключение, отчёт и свидетельство`);
+  }
+
+  // Reject at any stage
+  rejectApplication(appId, adminId, note) {
+    this._transition(appId, 'rejected', adminId, note);
+    const app = this.getAppById(appId);
+    this._notifyClient(app, 'status_changed', `Заявка ${app.appNumber} отклонена: ${note}`);
+  }
+
+  // ── HELPERS ─────────────────────────────────────────────────────────────
+  _transition(appId, status, byId, note) {
+    const app = this.getAppById(appId);
+    if (!app) return;
+    app.status = status;
     app.updatedAt = new Date().toISOString();
-    const mgr = this.users.find(u => u.id === managerId);
-    this.addNotification({ type: 'manager_assigned', targetRoles: ['manager'], targetIds: [managerId], relatedId: appId, message: `Вам назначена заявка ${app.sampleCode}. Клиент: ${this.users.find(u=>u.id===app.clientId)?.name}` });
+    app.timeline.push({ status, date: new Date().toISOString(), by: byId, note });
     this.notify();
   }
 
-  // PROTOCOLS
-  createProtocol(applicationId, managerId, content) {
-    const proto = { id: uuidv4(), applicationId, managerId, content, status: 'pending', createdAt: new Date().toISOString() };
-    this.protocols.push(proto);
-    const app = this.applications.find(a => a.id === applicationId);
-    if (app) { app.protocolReady = true; app.protocolId = proto.id; app.updatedAt = new Date().toISOString(); }
-    const mgr = this.users.find(u => u.id === managerId);
-    const admins = this.users.filter(u => u.role === 'admin');
-    admins.forEach(admin => {
-      this.addNotification({ type: 'protocol_ready', targetRoles: ['admin'], targetIds: [admin.id], relatedId: proto.id, message: `Протокол по заявке ${app?.sampleCode} готов. Лаборант: ${mgr?.name}` });
-    });
-    this.notify();
-    return proto;
-  }
-
-  sendProtocolToClient(applicationId, adminId) {
-    const app = this.applications.find(a => a.id === applicationId);
-    if (!app) return;
-    const proto = this.protocols.find(p => p.id === app.protocolId);
-    if (proto) proto.status = 'sent';
-    this.addNotification({ type: 'protocol_sent', targetRoles: ['client'], targetIds: [app.clientId], relatedId: applicationId, message: `Протокол по вашей заявке ${app.sampleCode} готов и отправлен вам` });
-    this.notify();
-  }
-
-  confirmProtocolDelivery(applicationId, clientId) {
-    const app = this.applications.find(a => a.id === applicationId);
-    if (!app) return;
-    app.protocolDelivered = true;
-    const proto = this.protocols.find(p => p.id === app.protocolId);
-    if (proto) proto.status = 'delivered';
-    const admins = this.users.filter(u => u.role === 'admin');
-    admins.forEach(admin => {
-      this.addNotification({ type: 'protocol_delivered', targetRoles: ['admin'], targetIds: [admin.id], relatedId: applicationId, message: `Клиент подтвердил получение протокола по заявке ${app.sampleCode}` });
-    });
-    this.notify();
-  }
-
-  // RESULTS
-  createResult(applicationId, adminId, content) {
-    const app = this.applications.find(a => a.id === applicationId);
-    const result = { id: uuidv4(), applicationId, adminId, protocolId: app?.protocolId, content, deliveredToClient: false, clientConfirmed: false, createdAt: new Date().toISOString() };
-    this.results.push(result);
-    if (app) { app.resultReady = true; app.resultId = result.id; app.updatedAt = new Date().toISOString(); }
-    this.addNotification({ type: 'result_sent', targetRoles: ['client'], targetIds: [app?.clientId], relatedId: result.id, message: `Итоговое заключение по вашей заявке ${app?.sampleCode} готово и отправлено` });
-    this.notify();
-    return result;
-  }
-
-  confirmResultDelivery(resultId, clientId) {
-    const result = this.results.find(r => r.id === resultId);
-    if (!result) return;
-    result.clientConfirmed = true;
-    const app = this.applications.find(a => a.id === result.applicationId);
-    this.notify();
-  }
-
-  // NOTIFICATIONS
-  addNotification(data) {
-    const notif = { id: uuidv4(), ...data, read: false, createdAt: new Date().toISOString() };
+  _notifyAdmins(type, relatedId, message) {
+    const adminIds = this.users.filter(u => u.role === 'admin').map(u => u.id);
+    const notif = { id: uuidv4(), type, targetIds: adminIds, relatedId, message, read: false, createdAt: new Date().toISOString() };
     this.notifications.unshift(notif);
   }
 
-  markNotificationRead(notifId) {
-    const n = this.notifications.find(n => n.id === notifId);
+  _notifyClient(app, type, message) {
+    const notif = { id: uuidv4(), type, targetIds: [app.clientId], relatedId: app.id, message, read: false, createdAt: new Date().toISOString() };
+    this.notifications.unshift(notif);
+  }
+
+  _notifyUser(userId, type, relatedId, message) {
+    const notif = { id: uuidv4(), type, targetIds: [userId], relatedId, message, read: false, createdAt: new Date().toISOString() };
+    this.notifications.unshift(notif);
+  }
+
+  // ── QUERIES ─────────────────────────────────────────────────────────────
+  getAppById(id)              { return this.applications.find(a => a.id === id); }
+  getUserById(id)             { return this.users.find(u => u.id === id); }
+  getProgramById(id)          { return this.programs.find(p => p.id === id); }
+  getManagers()               { return this.users.filter(u => u.role === 'manager'); }
+  getAdmins()                 { return this.users.filter(u => u.role === 'admin'); }
+  getClients()                { return this.users.filter(u => u.role === 'client'); }
+
+  getAllApplications() {
+    return [...this.applications].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }
+  getApplicationsForClient(clientId) {
+    return this.applications.filter(a => a.clientId === clientId).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }
+  // Manager sees only apps assigned to them
+  getApplicationsForManager(managerId) {
+    return this.applications.filter(a => a.assignedManagerId === managerId).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }
+
+  getNotificationsForUser(userId) {
+    return this.notifications.filter(n => n.targetIds.includes(userId));
+  }
+  getUnreadCount(userId) {
+    return this.notifications.filter(n => n.targetIds.includes(userId) && !n.read).length;
+  }
+  markNotificationRead(id) {
+    const n = this.notifications.find(n => n.id === id);
     if (n) n.read = true;
     this.notify();
   }
-
   markAllRead(userId) {
     this.notifications.filter(n => n.targetIds.includes(userId)).forEach(n => n.read = true);
     this.notify();
   }
-
-  getNotificationsForUser(userId) {
-    return this.notifications.filter(n => n.targetIds.includes(userId)).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }
-
-  getUnreadCount(userId) {
-    return this.notifications.filter(n => n.targetIds.includes(userId) && !n.read).length;
-  }
-
-  // GETTERS
-  getApplicationsForClient(clientId) {
-    return this.applications.filter(a => a.clientId === clientId).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }
-
-  getApplicationsForManager(managerId) {
-    return this.applications.filter(a => a.assignedManagerId === managerId || a.status === 'pending').sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }
-
-  getAllApplications() {
-    return [...this.applications].sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }
-
-  getManagers() { return this.users.filter(u => u.role === 'manager'); }
-  getAdmins() { return this.users.filter(u => u.role === 'admin'); }
-  getClients() { return this.users.filter(u => u.role === 'client'); }
-  getProgramById(id) { return this.programs.find(p => p.id === id); }
-  getUserById(id) { return this.users.find(u => u.id === id); }
-  getProtocolByAppId(appId) { const app = this.applications.find(a => a.id === appId); return app?.protocolId ? this.protocols.find(p => p.id === app.protocolId) : null; }
-  getResultByAppId(appId) { const app = this.applications.find(a => a.id === appId); return app?.resultId ? this.results.find(r => r.id === app.resultId) : null; }
 }
 
 export const store = new Store();
-export { PROGRAMS, PROGRAM_FORMS };

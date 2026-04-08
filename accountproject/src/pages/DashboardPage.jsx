@@ -3,8 +3,7 @@ import React from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
 import { Badge, StatusBadge, Button } from '../components/ui';
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { APPLICATION_STATUSES } from '../data/store';
 import '../styles/pages.css';
 
 function StatCard({ icon, label, value, color, sub }) {
@@ -21,23 +20,18 @@ function StatCard({ icon, label, value, color, sub }) {
   );
 }
 
-function AppRow({ app, store, onClick }) {
-  const client  = store.getUserById(app.clientId);
-  const program = store.getProgramById(app.programId);
-  const manager = store.getUserById(app.assignedManagerId);
+function AppMiniRow({ app, store, navigate }) {
+  const prog   = store.getProgramById(app.programId);
+  const client = store.getUserById(app.clientId);
   return (
-    <div className="app-row" onClick={onClick}>
-      <div className="app-row__info">
-        <span className="app-row__code">{app.sampleCode}</span>
-        <span className="app-row__name">{program?.name}</span>
-        {client && <span className="app-row__client">{client.name}</span>}
+    <div className="app-row-mini" onClick={() => navigate(`/applications/${app.id}`)}>
+      <div className="app-row-mini__left">
+        <span className="app-row-mini__num">{app.appNumber}</span>
+        <span className="app-row-mini__name">{prog?.name}</span>
+        {client && <span className="app-row-mini__org">{client.orgName || client.name}</span>}
       </div>
-      <div className="app-row__meta">
-        {manager && <Badge color="purple">{manager.name.split(' ')[0]}</Badge>}
+      <div className="app-row-mini__right">
         <StatusBadge status={app.status} />
-        <span className="app-row__date">
-          {format(new Date(app.createdAt), 'd MMM yyyy', { locale: ru })}
-        </span>
       </div>
     </div>
   );
@@ -49,89 +43,78 @@ export default function DashboardPage() {
   const navigate = useNavigate();
 
   const allApps  = store.getAllApplications();
-  const userApps = user.role === 'client'
-    ? store.getApplicationsForClient(user.id)
-    : user.role === 'manager'
-    ? store.getApplicationsForManager(user.id)
-    : allApps;
+  const myApps   = user.role === 'client'  ? store.getApplicationsForClient(user.id)
+                 : user.role === 'manager' ? store.getApplicationsForManager(user.id)
+                 : allApps;
 
-  const unread    = store.getUnreadCount(user.id);
-  const recentApps = userApps.slice(0, 5);
-  const pending   = allApps.filter(a => a.status === 'pending').length;
-  const signed    = allApps.filter(a => a.status === 'signed').length;
+  const unread   = store.getUnreadCount(user.id);
+  const greet    = () => { const h = new Date().getHours(); return h < 12 ? 'Доброе утро' : h < 18 ? 'Добрый день' : 'Добрый вечер'; };
 
-  const greet = () => {
-    const h = new Date().getHours();
-    if (h < 12) return 'Доброе утро';
-    if (h < 18) return 'Добрый день';
-    return 'Добрый вечер';
-  };
+  const statusCount = s => allApps.filter(a => a.status === s).length;
 
   return (
-    <div className="dashboard">
-      <div className="dashboard__greeting">
-        <h1>{greet()}, {user.name.split(' ')[1] || user.name.split(' ')[0]}! 👋</h1>
-        <p>{new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+    <div className="fade-in">
+      <div className="dashboard__greeting" style={{ marginBottom:'24px' }}>
+        <h1>{greet()}, {user.name.split(' ')[1] || user.name}! 👋</h1>
+        <p>{new Date().toLocaleDateString('ru-RU', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}</p>
       </div>
 
-      {/* Stats */}
       {user.role === 'admin' && (
         <div className="stats-grid">
-          <StatCard icon="📋" label="Всего заявок"     value={allApps.length}           color="var(--accent)" />
-          <StatCard icon="⏳" label="На рассмотрении"  value={pending}                  color="var(--yellow)" sub={`${Math.round(pending / Math.max(allApps.length, 1) * 100)}% от всех`} />
-          <StatCard icon="✅" label="Подписанных"       value={signed}                   color="var(--green)" />
-          <StatCard icon="🧪" label="Протоколов"        value={store.protocols.length}   color="var(--purple)" />
-          <StatCard icon="📄" label="Заключений"        value={store.results.length}     color="var(--accent)" />
-          <StatCard icon="🔔" label="Уведомлений"       value={unread}                   color={unread > 0 ? 'var(--red)' : 'var(--text-sub)'} sub="непрочитанных" />
+          <StatCard icon="📋" label="Всего заявок"    value={allApps.length}            color="var(--accent)"  />
+          <StatCard icon="⏳" label="Ожидают решения" value={statusCount('submitted')}  color="var(--yellow)"  />
+          <StatCard icon="✅" label="В действии"      value={statusCount('active') + statusCount('in_progress') + statusCount('completed')} color="var(--green)" />
+          <StatCard icon="🏁" label="Завершено"       value={statusCount('finished')}   color="var(--purple)"  />
+          <StatCard icon="❌" label="Отклонено"       value={statusCount('rejected')}   color="var(--red)"     sub="" />
+          <StatCard icon="🔔" label="Уведомлений"     value={unread}                    color={unread>0?'var(--red)':'var(--text-sub)'} sub="непрочитанных" />
         </div>
       )}
+
       {user.role === 'manager' && (
         <div className="stats-grid">
-          <StatCard icon="📋" label="Мои заявки"       value={store.getApplicationsForManager(user.id).filter(a => a.assignedManagerId === user.id).length} color="var(--accent)" />
-          <StatCard icon="⏳" label="Ожидают действий"  value={store.getApplicationsForManager(user.id).filter(a => a.status === 'pending').length}           color="var(--yellow)" />
-          <StatCard icon="🧪" label="Мои протоколы"    value={store.protocols.filter(p => p.managerId === user.id).length}                                     color="var(--purple)" />
-          <StatCard icon="🔔" label="Непрочитанных"    value={unread}                   color={unread > 0 ? 'var(--red)' : 'var(--text-sub)'} />
+          <StatCard icon="📋" label="Моих заданий"   value={myApps.length}                                    color="var(--accent)" />
+          <StatCard icon="⚙️" label="В работе"       value={myApps.filter(a=>a.status==='in_progress').length} color="var(--yellow)" />
+          <StatCard icon="✅" label="Завершено"       value={myApps.filter(a=>a.status==='completed').length}  color="var(--green)"  />
+          <StatCard icon="🔔" label="Уведомлений"    value={unread} color={unread>0?'var(--red)':'var(--text-sub)'} sub="непрочитанных" />
         </div>
       )}
+
       {user.role === 'client' && (
         <>
           <div className="stats-grid">
-            <StatCard icon="📋" label="Мои заявки"       value={userApps.length}                                  color="var(--accent)" />
-            <StatCard icon="⏳" label="На рассмотрении"  value={userApps.filter(a => a.status === 'pending').length} color="var(--yellow)" />
-            <StatCard icon="✅" label="Подписанных"       value={userApps.filter(a => a.status === 'signed').length}  color="var(--green)" />
-            <StatCard icon="🔔" label="Уведомлений"      value={unread}                                            color={unread > 0 ? 'var(--red)' : 'var(--text-sub)'} />
+            <StatCard icon="📋" label="Мои заявки"       value={myApps.length}                                                     color="var(--accent)" />
+            <StatCard icon="⏳" label="На рассмотрении"  value={myApps.filter(a=>['submitted','accepted'].includes(a.status)).length} color="var(--yellow)" />
+            <StatCard icon="⚙️" label="В процессе"      value={myApps.filter(a=>!['submitted','accepted','rejected','finished'].includes(a.status)).length} color="var(--cyan)" />
+            <StatCard icon="🏁" label="Завершено"        value={myApps.filter(a=>a.status==='finished').length}                    color="var(--green)"  />
           </div>
           <div className="cta-banner">
             <div>
               <h3>Подать новую заявку</h3>
-              <p>Выберите программу и заполните форму — это займёт несколько минут</p>
+              <p>Выберите программу проверки квалификации и заполните форму участника</p>
             </div>
             <Button onClick={() => navigate('/programs')} size="lg">🔬 Выбрать программу</Button>
           </div>
         </>
       )}
 
-      {/* Recent apps */}
-      <div className="recent-apps">
-        <div className="recent-apps__header">
-          <h3 className="recent-apps__title">
-            {user.role === 'client' ? 'Мои последние заявки' : 'Последние заявки'}
+      <div className="recent-box">
+        <div className="recent-box__header">
+          <h3 className="recent-box__title">
+            {user.role === 'manager' ? 'Мои задания' : user.role === 'client' ? 'Мои заявки' : 'Последние заявки'}
           </h3>
-          <Button variant="ghost" size="sm" onClick={() => navigate('/applications')}>Все заявки →</Button>
+          <Button variant="ghost" size="sm" onClick={() => navigate('/applications')}>Все →</Button>
         </div>
-        {recentApps.length === 0 ? (
-          <div className="recent-apps__empty">
-            <div className="recent-apps__empty-icon">📭</div>
-            <div style={{ fontWeight: 600 }}>Заявок пока нет</div>
-            {user.role === 'client' && (
-              <Button onClick={() => navigate('/programs')} style={{ marginTop: '12px' }}>Подать первую заявку</Button>
-            )}
+        {myApps.length === 0 ? (
+          <div style={{ textAlign:'center', padding:'28px', color:'var(--text-sub)' }}>
+            <div style={{ fontSize:'2rem', marginBottom:'8px' }}>📭</div>
+            <div style={{ fontWeight:600 }}>
+              {user.role === 'manager' ? 'Заданий пока нет' : 'Заявок пока нет'}
+            </div>
+            {user.role === 'client' && <Button onClick={()=>navigate('/programs')} style={{ marginTop:'12px' }}>Подать заявку</Button>}
           </div>
         ) : (
-          <div className="recent-apps__list">
-            {recentApps.map(app => (
-              <AppRow key={app.id} app={app} store={store} onClick={() => navigate(`/applications/${app.id}`)} />
-            ))}
+          <div className="recent-box__list">
+            {myApps.slice(0, 6).map(app => <AppMiniRow key={app.id} app={app} store={store} navigate={navigate} />)}
           </div>
         )}
       </div>
