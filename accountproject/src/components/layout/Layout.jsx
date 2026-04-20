@@ -7,36 +7,38 @@ import '../../styles/layout.css';
 
 const NAV = {
   admin: [
-    { path:'/dashboard',    icon:'📊', label:'Дашборд'         },
-    { path:'/applications', icon:'📋', label:'Заявки'          },
-    { path:'/notifications',icon:'🔔', label:'Уведомления'     },
-    { path:'/archive',      icon:'🗄️', label:'Архив'           },
-    { path:'/users',        icon:'👥', label:'Пользователи'    },
+    { path: '/dashboard', icon: '📊', label: 'Дашборд' },
+    { path: '/tours', icon: '🗂️', label: 'Туры' },
+    { path: '/applications', icon: '📋', label: 'Заявки' },
+    { path: '/notifications', icon: '🔔', label: 'Уведомления' },
+    { path: '/archive', icon: '🗄️', label: 'Архив' },
+    { path: '/users', icon: '👥', label: 'Пользователи' },
   ],
   manager: [
-    { path:'/dashboard',    icon:'📊', label:'Дашборд'         },
-    { path:'/applications', icon:'📋', label:'Мои задания'     },
-    { path:'/notifications',icon:'🔔', label:'Уведомления'     },
+    { path: '/dashboard', icon: '📊', label: 'Дашборд' },
+    { path: '/tours', icon: '🗂️', label: 'Мои туры' },
+    { path: '/applications', icon: '📋', label: 'Заявки' },
+    { path: '/notifications', icon: '🔔', label: 'Уведомления' },
   ],
   client: [
-    { path:'/dashboard',    icon:'🏠', label:'Главная'         },
-    { path:'/programs',     icon:'🔬', label:'Подать заявку'   },
-    { path:'/applications', icon:'📋', label:'Мои заявки'      },
-    { path:'/notifications',icon:'🔔', label:'Уведомления'     },
+    { path: '/dashboard', icon: '🏠', label: 'Главная' },
+    { path: '/programs', icon: '🔬', label: 'Подать заявку' },
+    { path: '/applications', icon: '📋', label: 'Мои заявки' },
+    { path: '/notifications', icon: '🔔', label: 'Уведомления' },
   ],
 };
 
-const ROLE_LABEL = { admin:'Администратор', manager:'Заведующий', client:'Клиент' };
+const ROLE_LABEL = { admin: 'Администратор', manager: 'Заведующий', client: 'Клиент' };
 
 export default function Layout({ children }) {
-  const store    = useStore();
-  const user     = store.currentUser;
+  const store = useStore();
+  const user = store.currentUser;
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   if (!user) return null;
 
-  const nav    = NAV[user.role] || NAV.client;
+  const nav = NAV[user.role] || NAV.client;
   const unread = store.getUnreadCount(user.id);
 
   const SidebarInner = () => (
@@ -50,18 +52,18 @@ export default function Layout({ children }) {
       </div>
       <div className="sidebar__user">
         <div className="sidebar__avatar">{user.name.charAt(0)}</div>
-        <div style={{ overflow:'hidden', minWidth:0 }}>
+        <div style={{ overflow: 'hidden', minWidth: 0 }}>
           <div className="sidebar__user-name">{user.name}</div>
           <div className="sidebar__user-role">{ROLE_LABEL[user.role]}</div>
         </div>
       </div>
       <nav className="sidebar__nav">
         {nav.map(item => {
-          const active  = location.pathname === item.path;
+          const active = location.pathname === item.path || (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
           const isNotif = item.path === '/notifications';
           return (
             <Link key={item.path} to={item.path} onClick={() => setMobileOpen(false)}
-              className={`nav-link${active?' nav-link--active':''}`}>
+              className={`nav-link${active ? ' nav-link--active' : ''}`}>
               <span className="nav-link__inner">
                 <span className="nav-link__icon">{item.icon}</span>
                 {item.label}

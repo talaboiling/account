@@ -6,35 +6,35 @@ import { Input, Textarea, Button, PageHeader } from '../components/ui';
 import '../styles/pages.css';
 
 const EMPTY = {
-  objectName:   '',
-  indicators:   '',
+  objectName: '',
+  indicators: '',
   measureRange: '',
-  normDoc:      '',
-  deptName:     '',
+  normDoc: '',
+  deptName: '',
   accreditCert: '',
-  headName:     '',
-  headContact:  '',
-  orgDetails:   '',
+  headName: '',
+  headContact: '',
+  orgDetails: '',
   directorName: '',
 };
 
 export default function ApplicationFormPage() {
-  const store     = useStore();
-  const navigate  = useNavigate();
+  const store = useStore();
+  const navigate = useNavigate();
   const { programId } = useParams();
-  const user      = store.currentUser;
-  const program   = store.getProgramById(programId);
+  const user = store.currentUser;
+  const program = store.getProgramById(programId);
 
-  const [fd,         setFd]         = useState(EMPTY);
-  const [errors,     setErrors]     = useState({});
+  const [fd, setFd] = useState(EMPTY);
+  const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
-  const [success,    setSuccess]    = useState(null);
+  const [success, setSuccess] = useState(null);
 
-  if (!program) return <div style={{ padding:'40px', color:'var(--red)' }}>Программа не найдена</div>;
+  if (!program) return <div style={{ padding: '40px', color: 'var(--red)' }}>Программа не найдена</div>;
 
   const set = k => e => setFd(f => ({ ...f, [k]: e.target.value }));
 
-  const required = ['objectName','indicators','measureRange','normDoc','deptName','headName','headContact','orgDetails','directorName'];
+  const required = ['objectName', 'indicators', 'measureRange', 'normDoc', 'deptName', 'headName', 'headContact', 'orgDetails', 'directorName'];
 
   const validate = () => {
     const e = {};

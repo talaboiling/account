@@ -7,24 +7,24 @@ import { APPLICATION_STATUSES } from '../data/store';
 import '../styles/pages.css';
 
 const TYPE_CFG = {
-  application:  { icon:'📋', color:'var(--accent)',  bg:'rgba(79,142,247,0.12)',   badgeColor:'blue',   label:'Заявка'       },
-  status_event: { icon:'🔄', color:'var(--yellow)',  bg:'rgba(245,197,66,0.12)',   badgeColor:'yellow', label:'Статус'       },
-  notification: { icon:'🔔', color:'var(--purple)',  bg:'rgba(164,127,255,0.12)', badgeColor:'purple', label:'Уведомление'  },
-  contract:     { icon:'📝', color:'var(--cyan)',    bg:'rgba(56,189,248,0.12)',   badgeColor:'cyan',   label:'Договор'      },
-  document:     { icon:'📦', color:'var(--green)',   bg:'rgba(60,201,138,0.12)',   badgeColor:'green',  label:'Документ'     },
+  application: { icon: '📋', color: 'var(--accent)', bg: 'rgba(79,142,247,0.12)', badgeColor: 'blue', label: 'Заявка' },
+  status_event: { icon: '🔄', color: 'var(--yellow)', bg: 'rgba(245,197,66,0.12)', badgeColor: 'yellow', label: 'Статус' },
+  notification: { icon: '🔔', color: 'var(--purple)', bg: 'rgba(164,127,255,0.12)', badgeColor: 'purple', label: 'Уведомление' },
+  contract: { icon: '📝', color: 'var(--cyan)', bg: 'rgba(56,189,248,0.12)', badgeColor: 'cyan', label: 'Договор' },
+  document: { icon: '📦', color: 'var(--green)', bg: 'rgba(60,201,138,0.12)', badgeColor: 'green', label: 'Документ' },
 };
 
 export default function ArchivePage() {
-  const store    = useStore();
+  const store = useStore();
   const navigate = useNavigate();
-  const [tab,    setTab]    = useState('all');
+  const [tab, setTab] = useState('all');
   const [search, setSearch] = useState('');
 
   // Build flat log from all sources
   const entries = [];
 
   store.getAllApplications().forEach(app => {
-    const prog   = store.getProgramById(app.programId);
+    const prog = store.getProgramById(app.programId);
     const client = store.getUserById(app.clientId);
 
     // Application creation
@@ -89,7 +89,7 @@ export default function ArchivePage() {
   // Sort by time descending
   entries.sort((a, b) => new Date(b.time) - new Date(a.time));
 
-  const tabMap = { applications:'application', statuses:'status_event', contracts:'contract', documents:'document', notifications:'notification' };
+  const tabMap = { applications: 'application', statuses: 'status_event', contracts: 'contract', documents: 'document', notifications: 'notification' };
 
   const filtered = entries.filter(e => {
     const matchTab = tab === 'all' || e.type === tabMap[tab];
@@ -100,24 +100,24 @@ export default function ArchivePage() {
 
   const count = t => entries.filter(e => e.type === tabMap[t]).length;
 
-  const fmtDate = d => new Date(d).toLocaleString('ru-RU', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  const fmtDate = d => new Date(d).toLocaleString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
   return (
     <div className="fade-in">
       <PageHeader title="Архив / Журнал событий" subtitle={`Всего записей: ${entries.length}`} />
 
-      <div style={{ display:'flex', gap:'10px', marginBottom:'16px' }}>
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
         <input className="search-bar" value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍  Поиск по событиям..." />
       </div>
 
       <Tabs
         tabs={[
-          { id:'all',           label:'Все',           count: entries.length },
-          { id:'applications',  label:'Заявки',        count: count('applications')  },
-          { id:'statuses',      label:'Статусы',       count: count('statuses')      },
-          { id:'contracts',     label:'Договоры',      count: count('contracts')     },
-          { id:'documents',     label:'Документы',     count: count('documents')     },
-          { id:'notifications', label:'Уведомления',   count: count('notifications') },
+          { id: 'all', label: 'Все', count: entries.length },
+          { id: 'applications', label: 'Заявки', count: count('applications') },
+          { id: 'statuses', label: 'Статусы', count: count('statuses') },
+          { id: 'contracts', label: 'Договоры', count: count('contracts') },
+          { id: 'documents', label: 'Документы', count: count('documents') },
+          { id: 'notifications', label: 'Уведомления', count: count('notifications') },
         ]}
         active={tab}
         onChange={setTab}
@@ -135,7 +135,7 @@ export default function ArchivePage() {
                 onClick={() => e.appId && navigate(`/applications/${e.appId}`)}
                 className={`archive-item${e.appId ? ' archive-item--link' : ''}`}
               >
-                <div className="archive-item__icon" style={{ background: cfg.bg, color: cfg.color, borderRadius:'8px', width:'30px', height:'30px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.9rem', flexShrink:0 }}>
+                <div className="archive-item__icon" style={{ background: cfg.bg, color: cfg.color, borderRadius: '8px', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', flexShrink: 0 }}>
                   {cfg.icon}
                 </div>
                 <div className="archive-item__body">

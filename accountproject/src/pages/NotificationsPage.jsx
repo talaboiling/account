@@ -6,25 +6,25 @@ import { PageHeader, Button, EmptyState } from '../components/ui';
 import '../styles/pages.css';
 
 const ICONS = {
-  app_submitted:    '📋',
-  status_changed:   '🔄',
-  draft_sent:       '📄',
-  signed_contract:  '✅',
-  task_assigned:    '📌',
-  work_status:      '⚙️',
-  samples_sent:     '📦',
+  app_submitted: '📋',
+  status_changed: '🔄',
+  draft_sent: '📄',
+  signed_contract: '✅',
+  task_assigned: '📌',
+  work_status: '⚙️',
+  samples_sent: '📦',
   samples_received: '✓',
-  protocol_uploaded:'🔬',
-  finished:         '🏁',
-  default:          '🔔',
+  protocol_uploaded: '🔬',
+  finished: '🏁',
+  default: '🔔',
 };
 
 export default function NotificationsPage() {
-  const store    = useStore();
-  const user     = store.currentUser;
+  const store = useStore();
+  const user = store.currentUser;
   const navigate = useNavigate();
-  const notifs   = store.getNotificationsForUser(user.id);
-  const unread   = notifs.filter(n => !n.read).length;
+  const notifs = store.getNotificationsForUser(user.id);
+  const unread = notifs.filter(n => !n.read).length;
 
   const handleClick = n => {
     store.markNotificationRead(n.id);
@@ -37,10 +37,10 @@ export default function NotificationsPage() {
     const d = new Date(date);
     const now = new Date();
     const diff = Math.floor((now - d) / 1000);
-    if (diff < 60)   return 'только что';
-    if (diff < 3600) return `${Math.floor(diff/60)} мин. назад`;
-    if (diff < 86400)return `${Math.floor(diff/3600)} ч. назад`;
-    return d.toLocaleDateString('ru-RU', { day:'numeric', month:'short', year:'numeric' });
+    if (diff < 60) return 'только что';
+    if (diff < 3600) return `${Math.floor(diff / 60)} мин. назад`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} ч. назад`;
+    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
   return (

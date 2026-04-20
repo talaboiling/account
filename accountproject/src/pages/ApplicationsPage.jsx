@@ -6,45 +6,45 @@ import { PageHeader, StatusBadge, Badge, Button, Tabs, EmptyState } from '../com
 import '../styles/pages.css';
 
 export default function ApplicationsPage() {
-  const store    = useStore();
-  const user     = store.currentUser;
+  const store = useStore();
+  const user = store.currentUser;
   const navigate = useNavigate();
-  const [search, setSearch]   = useState('');
-  const [tab,    setTab]      = useState('all');
+  const [search, setSearch] = useState('');
+  const [tab, setTab] = useState('all');
 
-  const base = user.role === 'client'  ? store.getApplicationsForClient(user.id)
-             : user.role === 'manager' ? store.getApplicationsForManager(user.id)
-             : store.getAllApplications();
+  const base = user.role === 'client' ? store.getApplicationsForClient(user.id)
+    : user.role === 'manager' ? store.getApplicationsForManager(user.id)
+      : store.getAllApplications();
 
   // Group tabs
-  const inProgress = ['accepted','draft_sent','signed','active','in_progress','completed','samples_sent','samples_received','protocol_uploaded','processing'];
+  const inProgress = ['accepted', 'draft_sent', 'signed', 'active', 'in_progress', 'completed', 'samples_sent', 'samples_received', 'protocol_uploaded', 'processing'];
 
   const filtered = base.filter(app => {
-    const prog   = store.getProgramById(app.programId);
+    const prog = store.getProgramById(app.programId);
     const client = store.getUserById(app.clientId);
-    const q      = search.toLowerCase();
+    const q = search.toLowerCase();
     const matchQ = !search
       || app.appNumber.toLowerCase().includes(q)
       || prog?.name.toLowerCase().includes(q)
       || client?.name.toLowerCase().includes(q)
       || client?.orgName?.toLowerCase().includes(q);
-    const matchTab = tab === 'all'         ? true
-                   : tab === 'new'         ? app.status === 'submitted'
-                   : tab === 'active'      ? inProgress.includes(app.status)
-                   : tab === 'finished'    ? app.status === 'finished'
-                   : tab === 'rejected'    ? app.status === 'rejected'
-                   : true;
+    const matchTab = tab === 'all' ? true
+      : tab === 'new' ? app.status === 'submitted'
+        : tab === 'active' ? inProgress.includes(app.status)
+          : tab === 'finished' ? app.status === 'finished'
+            : tab === 'rejected' ? app.status === 'rejected'
+              : true;
     return matchQ && matchTab;
   });
 
   const c = s => base.filter(a => s(a)).length;
 
   const tabDefs = [
-    { id:'all',      label:'Все',           count: base.length },
-    { id:'new',      label:'Новые',         count: c(a => a.status === 'submitted') },
-    { id:'active',   label:'В процессе',    count: c(a => inProgress.includes(a.status)) },
-    { id:'finished', label:'Завершённые',   count: c(a => a.status === 'finished') },
-    { id:'rejected', label:'Отклонённые',   count: c(a => a.status === 'rejected') },
+    { id: 'all', label: 'Все', count: base.length },
+    { id: 'new', label: 'Новые', count: c(a => a.status === 'submitted') },
+    { id: 'active', label: 'В процессе', count: c(a => inProgress.includes(a.status)) },
+    { id: 'finished', label: 'Завершённые', count: c(a => a.status === 'finished') },
+    { id: 'rejected', label: 'Отклонённые', count: c(a => a.status === 'rejected') },
   ];
 
   return (
@@ -55,7 +55,7 @@ export default function ApplicationsPage() {
         actions={user.role === 'client' && <Button onClick={() => navigate('/programs')}>+ Новая заявка</Button>}
       />
 
-      <div style={{ display:'flex', gap:'10px', marginBottom:'16px' }}>
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
         <input className="search-bar" value={search} onChange={e => setSearch(e.target.value)}
           placeholder="🔍  Поиск по номеру, программе, организации..." />
       </div>
@@ -67,11 +67,11 @@ export default function ApplicationsPage() {
       ) : (
         <div className="apps-list">
           {filtered.map((app, i) => {
-            const prog   = store.getProgramById(app.programId);
+            const prog = store.getProgramById(app.programId);
             const client = store.getUserById(app.clientId);
-            const mgr    = store.getUserById(app.assignedManagerId);
+            const mgr = store.getUserById(app.assignedManagerId);
             return (
-              <div key={app.id} className="app-card" onClick={() => navigate(`/applications/${app.id}`)} style={{ animationDelay:`${i*0.03}s` }}>
+              <div key={app.id} className="app-card" onClick={() => navigate(`/applications/${app.id}`)} style={{ animationDelay: `${i * 0.03}s` }}>
                 <div className="app-card__inner">
                   <div className="app-card__left">
                     <div className="app-card__prog-icon">{prog?.icon}</div>
@@ -82,7 +82,7 @@ export default function ApplicationsPage() {
                         {user.role !== 'client' && <span className="app-card__meta-item">🏢 {client?.orgName || client?.name}</span>}
                         {mgr && <span className="app-card__meta-item">👤 {mgr.name}</span>}
                         <span className="app-card__meta-item">
-                          {new Date(app.createdAt).toLocaleDateString('ru-RU', { day:'numeric', month:'short', year:'numeric' })}
+                          {new Date(app.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })}
                         </span>
                       </div>
                     </div>

@@ -3,11 +3,11 @@ import React from 'react';
 import '../styles/ui.css';
 import { APPLICATION_STATUSES } from '../data/store';
 
-export function Button({ children, variant='primary', size='md', onClick, disabled, type='button', className='' }) {
+export function Button({ children, variant = 'primary', size = 'md', onClick, disabled, type = 'button', className = '' }) {
   return <button type={type} onClick={onClick} disabled={disabled} className={`btn btn--${size} btn--${variant} ${className}`}>{children}</button>;
 }
 
-export function Badge({ children, color='default', className='' }) {
+export function Badge({ children, color = 'default', className = '' }) {
   return <span className={`badge badge--${color} ${className}`}>{children}</span>;
 }
 
@@ -17,21 +17,21 @@ export function StatusBadge({ status }) {
   return <Badge color={cfg.color}>{cfg.label}</Badge>;
 }
 
-export function Input({ label, id, error, className='', ...props }) {
+export function Input({ label, id, error, className = '', ...props }) {
   return (
     <div className={`field ${className}`}>
       {label && <label htmlFor={id} className="field__label">{label}</label>}
-      <input id={id} {...props} className={`field__input${error?' field__input--error':''}`} />
+      <input id={id} {...props} className={`field__input${error ? ' field__input--error' : ''}`} />
       {error && <span className="field__error">{error}</span>}
     </div>
   );
 }
 
-export function Select({ label, id, options=[], error, className='', ...props }) {
+export function Select({ label, id, options = [], error, className = '', ...props }) {
   return (
     <div className={`field ${className}`}>
       {label && <label htmlFor={id} className="field__label">{label}</label>}
-      <select id={id} {...props} className={`field__select${error?' field__select--error':''}`}>
+      <select id={id} {...props} className={`field__select${error ? ' field__select--error' : ''}`}>
         <option value="">— Выберите —</option>
         {options.map(o => typeof o === 'string'
           ? <option key={o} value={o}>{o}</option>
@@ -43,17 +43,17 @@ export function Select({ label, id, options=[], error, className='', ...props })
   );
 }
 
-export function Textarea({ label, id, error, className='', rows=4, ...props }) {
+export function Textarea({ label, id, error, className = '', rows = 4, ...props }) {
   return (
     <div className={`field ${className}`}>
       {label && <label htmlFor={id} className="field__label">{label}</label>}
-      <textarea id={id} rows={rows} {...props} className={`field__textarea${error?' field__textarea--error':''}`} />
+      <textarea id={id} rows={rows} {...props} className={`field__textarea${error ? ' field__textarea--error' : ''}`} />
       {error && <span className="field__error">{error}</span>}
     </div>
   );
 }
 
-export function Modal({ open, onClose, title, children, width=540 }) {
+export function Modal({ open, onClose, title, children, width = 540 }) {
   if (!open) return null;
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -72,10 +72,10 @@ export function Tabs({ tabs, active, onChange }) {
   return (
     <div className="tabs">
       {tabs.map(t => (
-        <button key={t.id} onClick={() => onChange(t.id)} className={`tab-btn${active===t.id?' tab-btn--active':''}`}>
+        <button key={t.id} onClick={() => onChange(t.id)} className={`tab-btn${active === t.id ? ' tab-btn--active' : ''}`}>
           {t.icon && <span>{t.icon}</span>}
           {t.label}
-          {t.count !== undefined && <Badge color={active===t.id?'blue':'default'} className="badge--xs">{t.count}</Badge>}
+          {t.count !== undefined && <Badge color={active === t.id ? 'blue' : 'default'} className="badge--xs">{t.count}</Badge>}
         </button>
       ))}
     </div>
@@ -103,7 +103,7 @@ export function InfoRow({ label, value }) {
   );
 }
 
-export function Alert({ color='blue', text, children }) {
+export function Alert({ color = 'blue', text, children }) {
   return (
     <div className={`alert alert--${color}`}>
       {text && <span className="alert__text">{text}</span>}
@@ -135,7 +135,7 @@ export function SectionBox({ title, icon, children }) {
 }
 
 // Simulated file upload — returns a fake filename
-export function FileUpload({ label, onUpload, accept='.pdf,.doc,.docx', current }) {
+export function FileUpload({ label, onUpload, accept = '.pdf,.doc,.docx', current }) {
   const handleChange = e => {
     const file = e.target.files?.[0];
     if (file) onUpload(file.name);
@@ -150,11 +150,11 @@ export function FileUpload({ label, onUpload, accept='.pdf,.doc,.docx', current 
           <Badge color="green" className="file-row__badge">Загружен</Badge>
         </div>
       )}
-      <label style={{ display:'inline-flex', alignItems:'center', gap:'8px', padding:'9px 16px', background:'var(--bg-card2)', border:'1px dashed var(--border)', borderRadius:'var(--radius-sm)', cursor:'pointer', fontSize:'0.875rem', color:'var(--text-sub)', transition:'all var(--transition)' }}
-        onMouseEnter={e => { e.currentTarget.style.borderColor='var(--accent)'; e.currentTarget.style.color='var(--text)'; }}
-        onMouseLeave={e => { e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.color='var(--text-sub)'; }}>
+      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '9px 16px', background: 'var(--bg-card2)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text-sub)', transition: 'all var(--transition)' }}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--text)'; }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-sub)'; }}>
         <span>📁</span> {current ? 'Заменить файл' : 'Выбрать файл'}
-        <input type="file" accept={accept} onChange={handleChange} style={{ display:'none' }} />
+        <input type="file" accept={accept} onChange={handleChange} style={{ display: 'none' }} />
       </label>
     </div>
   );
@@ -163,18 +163,18 @@ export function FileUpload({ label, onUpload, accept='.pdf,.doc,.docx', current 
 // Step progress tracker
 export function StepTracker({ currentStep }) {
   const steps = [
-    { n:1,  label:'Подана'         },
-    { n:2,  label:'Принята'        },
-    { n:3,  label:'Драфт договора' },
-    { n:4,  label:'Договор подписан'},
-    { n:5,  label:'В действии'     },
-    { n:6,  label:'В работе'       },
-    { n:7,  label:'Работа завершена'},
-    { n:8,  label:'Образцы отправлены'},
-    { n:9,  label:'Образцы приняты'},
-    { n:10, label:'Протокол прикреплён'},
-    { n:11, label:'Обработка'      },
-    { n:12, label:'Завершено'      },
+    { n: 1, label: 'Подана' },
+    { n: 2, label: 'Принята' },
+    { n: 3, label: 'Драфт договора' },
+    { n: 4, label: 'Договор подписан' },
+    { n: 5, label: 'В действии' },
+    { n: 6, label: 'В работе' },
+    { n: 7, label: 'Работа завершена' },
+    { n: 8, label: 'Образцы отправлены' },
+    { n: 9, label: 'Образцы приняты' },
+    { n: 10, label: 'Протокол прикреплён' },
+    { n: 11, label: 'Обработка' },
+    { n: 12, label: 'Завершено' },
   ];
   return (
     <div className="step-tracker">
@@ -202,9 +202,9 @@ export function Timeline({ items, store }) {
   return (
     <div className="timeline">
       {items.map((item, i) => {
-        const cfg   = S[item.status] || { label: item.status, color: 'default' };
-        const user  = store.getUserById(item.by);
-        const colors = { green:'var(--green)', blue:'var(--accent)', yellow:'var(--yellow)', red:'var(--red)', purple:'var(--purple)', cyan:'var(--cyan)', orange:'var(--orange)', default:'var(--text-dim)' };
+        const cfg = S[item.status] || { label: item.status, color: 'default' };
+        const user = store.getUserById(item.by);
+        const colors = { green: 'var(--green)', blue: 'var(--accent)', yellow: 'var(--yellow)', red: 'var(--red)', purple: 'var(--purple)', cyan: 'var(--cyan)', orange: 'var(--orange)', default: 'var(--text-dim)' };
         const c = colors[cfg.color] || colors.default;
         return (
           <div key={i} className="timeline-item">
@@ -215,7 +215,7 @@ export function Timeline({ items, store }) {
             <div className="timeline-item__body">
               <div className="timeline-item__status" style={{ color: c }}>{cfg.label}</div>
               <div className="timeline-item__meta">
-                {user?.name} · {new Date(item.date).toLocaleString('ru-RU', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })}
+                {user?.name} · {new Date(item.date).toLocaleString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
               </div>
               {item.note && <div className="timeline-item__note">{item.note}</div>}
             </div>
