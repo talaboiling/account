@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, StatusBadge, Badge, Button, Tabs, EmptyState } from '../components/ui';
+import { PageHeader, StatusBadge, Button, Tabs, EmptyState } from '../components/ui';
 import '../styles/pages.css';
 
 export default function ApplicationsPage() {

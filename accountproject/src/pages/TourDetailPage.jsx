@@ -55,10 +55,6 @@ export default function TourDetailPage() {
     closeModal();
   };
 
-  // All apps signed (or accepted/active) = tour ready to start
-  const allSigned = apps.length > 0 && apps.every(a =>
-    ['signed','active','in_progress','completed','samples_sent','samples_received','protocol_uploaded','processing','finished'].includes(a.status)
-  );
   const anySigned = apps.some(a => a.status === 'signed');
 
   return (

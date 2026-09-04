@@ -3,7 +3,6 @@ import React from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
 import { Badge, StatusBadge, Button } from '../components/ui';
-import { TOUR_STATUSES } from '../data/store';
 import '../styles/pages.css';
 
 function StatCard({ icon, label, value, color, sub }) {
