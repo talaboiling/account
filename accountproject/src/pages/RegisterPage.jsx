@@ -2,110 +2,87 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { Input, Button } from '../components/ui';
+import { Input, Button, Alert } from '../components/ui';
 import '../styles/pages.css';
 
 export default function RegisterPage() {
-  const store    = useStore();
+  const store = useStore();
   const navigate = useNavigate();
-  const [step,        setStep]        = useState(1);
-  const [formData,    setFormData]    = useState({ name: '', email: '', phone: '', orgName: '', password: '', confirm: '' });
-  const [verifyCode,  setVerifyCode]  = useState('');
-  const [demoCode,    setDemoCode]    = useState('');
-  const [errors,      setErrors]      = useState({});
-  const [error,       setError]       = useState('');
-  const [loading,     setLoading]     = useState(false);
-  const [pendingEmail,setPendingEmail]= useState('');
+  const [form, setForm] = useState({ name: '', orgName: '', phone: '', email: '', password: '' });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState('form'); // 'form' | 'verify'
+  const [devCode, setDevCode] = useState('');
+  const [code, setCode] = useState('');
 
-  const validate = () => {
-    const e = {};
-    if (!formData.name.trim())            e.name    = 'Введите ФИО';
-    if (!formData.email.includes('@'))    e.email   = 'Введите корректный email';
-    if (formData.password.length < 6)    e.password = 'Минимум 6 символов';
-    if (formData.password !== formData.confirm) e.confirm = 'Пароли не совпадают';
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
+  const update = key => e => setForm(f => ({ ...f, [key]: e.target.value }));
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validate()) return;
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 500));
-    const result = store.registerClient({ ...formData });
+  const handleRegister = async e => {
+    e.preventDefault(); setError(''); setLoading(true);
+    const { email, password, name, orgName, phone } = form;
+    const res = await store.registerClient({ email, password, name, orgName, phone });
     setLoading(false);
-    if (result.error) { setError(result.error); return; }
-    setPendingEmail(formData.email);
-    setDemoCode(result.verificationCode);
-    setStep(2);
+    if (res.error) { setError(res.error); return; }
+    setDevCode(res.verificationCode);
+    setStep('verify');
   };
 
-  const handleVerify = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 400));
-    const result = store.verifyEmail(pendingEmail, verifyCode);
+  const handleVerify = async e => {
+    e.preventDefault(); setError(''); setLoading(true);
+    const res = await store.verifyEmail(form.email, code);
     setLoading(false);
-    if (result.error) { setError(result.error); return; }
-    store.login(pendingEmail, formData.password);
-    navigate('/dashboard');
+    if (res.error) { setError(res.error); return; }
+    navigate('/login');
   };
-
-  const set = k => e => setFormData(f => ({ ...f, [k]: e.target.value }));
-
-  if (step === 2) return (
-    <div className="verify-page">
-      <div className="verify-page__inner">
-        <div className="verify-header">
-          <div className="verify-header__icon">📧</div>
-          <h2 className="verify-header__title">Подтверждение Email</h2>
-          <p className="verify-header__sub">
-            Введите код, отправленный на <strong>{pendingEmail}</strong>
-          </p>
-        </div>
-        <div className="login-card">
-          <div className="verify-code-hint">
-            🔑 Демо-режим: ваш код <strong>{demoCode}</strong>
-          </div>
-          <form className="login-card__form" onSubmit={handleVerify}>
-            <Input label="Код подтверждения" id="code" value={verifyCode}
-              onChange={e => setVerifyCode(e.target.value)}
-              placeholder="000000" maxLength={6} required />
-            {error && <div className="login-error">{error}</div>}
-            <Button type="submit" size="lg" disabled={loading} className="btn--full">
-              {loading ? 'Проверяем...' : '✓ Подтвердить'}
-            </Button>
-          </form>
-        </div>
-      </div>
-    </div>
-  );
 
   return (
-    <div className="register-page">
-      <div className="register-page__inner">
-        <div className="register-logo">
-          <div className="register-logo__icon">⚗️</div>
-          <h1 className="register-logo__title">ЛабКонтроль</h1>
-          <p className="register-logo__sub">Создание аккаунта</p>
+    <div className="auth-page">
+      <div className="auth-blob-1" /><div className="auth-blob-2" />
+      <div className="auth-inner">
+        <div className="auth-logo">
+          <div className="auth-logo__icon">🏛️</div>
+          <h1 className="auth-logo__title">ЦСЭЭ</h1>
+          <p className="auth-logo__sub">Центр стандартизации, экспертизы и оценки</p>
         </div>
-        <div className="register-card">
-          <form className="register-card__form" onSubmit={handleSubmit}>
-            <Input label="ФИО *"            id="name"     value={formData.name}     onChange={set('name')}     placeholder="Иванов Иван Иванович"     error={errors.name} />
-            <Input label="Email *"          id="email"    type="email" value={formData.email}    onChange={set('email')}    placeholder="your@email.ru"            error={errors.email} />
-            <Input label="Телефон"          id="phone"    type="tel"   value={formData.phone}    onChange={set('phone')}    placeholder="+7 (___) ___-__-__" />
-            <Input label="Организация / ИП" id="orgName"  value={formData.orgName}  onChange={set('orgName')}  placeholder="ООО «Название» или ИП Фамилия" />
-            <Input label="Пароль *"         id="password" type="password" value={formData.password} onChange={set('password')} placeholder="Минимум 6 символов"       error={errors.password} />
-            <Input label="Повторите пароль *" id="confirm" type="password" value={formData.confirm}  onChange={set('confirm')}  placeholder="••••••••"                  error={errors.confirm} />
-            {error && <div className="login-error">⚠️ {error}</div>}
-            <Button type="submit" size="lg" disabled={loading} className="btn--full">
-              {loading ? 'Регистрируем...' : '→ Зарегистрироваться'}
-            </Button>
-          </form>
-          <div className="register-card__login">
-            Уже есть аккаунт?{' '}<Link to="/login">Войти</Link>
+        <div className="auth-card">
+          {step === 'form' ? (
+            <>
+              <h2 className="auth-card__title">Регистрация клиента</h2>
+              <form className="auth-card__form" onSubmit={handleRegister}>
+                <Input label="ФИО" id="name" value={form.name} onChange={update('name')} placeholder="Иванов Иван Иванович" required />
+                <Input label="Организация" id="orgName" value={form.orgName} onChange={update('orgName')} placeholder="ТОО «Компания»" required />
+                <Input label="Телефон" id="phone" value={form.phone} onChange={update('phone')} placeholder="+7 (7XX) XXX-XX-XX" required />
+                <Input label="Email" id="email" type="email" value={form.email} onChange={update('email')} placeholder="your@email.kz" required />
+                <Input label="Пароль" id="password" type="password" value={form.password} onChange={update('password')} placeholder="••••••••" required />
+                {error && <div className="auth-error">⚠️ {error}</div>}
+                <Button type="submit" size="lg" disabled={loading} className="btn--full">
+                  {loading ? '⏳ Регистрируем...' : '→ Зарегистрироваться'}
+                </Button>
+              </form>
+            </>
+          ) : (
+            <>
+              <h2 className="auth-card__title">Подтверждение email</h2>
+              <Alert color="blue" text={`Код подтверждения отправлен на ${form.email}.`} />
+              <form className="auth-card__form" onSubmit={handleVerify}>
+                <Input label="Код подтверждения" id="code" value={code} onChange={e => setCode(e.target.value)} placeholder="123456" required />
+                {error && <div className="auth-error">⚠️ {error}</div>}
+                <Button type="submit" size="lg" disabled={loading} className="btn--full">
+                  {loading ? '⏳ Проверяем...' : '→ Подтвердить'}
+                </Button>
+              </form>
+            </>
+          )}
+          <div className="auth-card__footer">Уже есть аккаунт? <Link to="/login">Войти</Link></div>
+        </div>
+        {step === 'verify' && devCode && (
+          <div className="demo-box">
+            <div className="demo-box__label">Демо-режим (письмо не отправляется реально)</div>
+            <div className="demo-box__btns">
+              <div className="demo-btn" style={{ cursor: 'default' }}>Код: {devCode}</div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

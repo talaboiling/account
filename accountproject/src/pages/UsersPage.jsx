@@ -2,54 +2,52 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { PageHeader, Badge, Tabs, Modal, Input, Select, Button } from '../components/ui';
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
-import { v4 as uuidv4 } from 'uuid';
 import '../styles/pages.css';
 
-const ROLE_LABEL = { admin: 'Администратор', manager: 'Лаборант', client: 'Клиент' };
+const ROLE_LABEL = { admin: 'Администратор', manager: 'Заведующий', client: 'Клиент' };
 const ROLE_COLOR = { admin: 'blue', manager: 'purple', client: 'green' };
 
 export default function UsersPage() {
   const store = useStore();
-  const [tab,        setTab]        = useState('all');
-  const [search,     setSearch]     = useState('');
+  const [tab, setTab] = useState('all');
+  const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
-  const [newUser,    setNewUser]    = useState({ name: '', email: '', phone: '', position: '', role: 'manager' });
-  const [created,    setCreated]    = useState(null);
-  const [error,      setError]      = useState('');
+  const [nd, setNd] = useState({ name: '', email: '', phone: '', position: '', role: 'manager' });
+  const [created, setCreated] = useState(null);
+  const [error, setError] = useState('');
+  const [creating, setCreating] = useState(false);
 
-  const tabMap = { admin: 'admin', manager: 'manager', client: 'client' };
+  const setF = k => e => setNd(f => ({ ...f, [k]: e.target.value }));
 
+  const tabMap = { admins: 'admin', managers: 'manager', clients: 'client' };
   const filtered = store.users.filter(u => {
-    const matchRole   = tab === 'all' || u.role === tabMap[tab];
-    const matchSearch = !search || u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase());
+    const matchRole = tab === 'all' || u.role === tabMap[tab];
+    const q = search.toLowerCase();
+    const matchSearch = !search || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || u.orgName?.toLowerCase().includes(q);
     return matchRole && matchSearch;
   });
 
-  const counts = {
-    all:     store.users.length,
-    admin:   store.users.filter(u => u.role === 'admin').length,
-    manager: store.users.filter(u => u.role === 'manager').length,
-    client:  store.users.filter(u => u.role === 'client').length,
-  };
+  const count = r => store.users.filter(u => u.role === r).length;
 
-  const set = k => e => setNewUser(f => ({ ...f, [k]: e.target.value }));
-
-  const handleCreate = () => {
-    if (!newUser.name || !newUser.email) { setError('Заполните имя и email'); return; }
-    if (store.users.find(u => u.email === newUser.email)) { setError('Email уже используется'); return; }
-    const password = `Pass${Math.floor(1000 + Math.random() * 9000)}!`;
-    const user = { id: uuidv4(), ...newUser, password, verified: true, createdAt: new Date().toISOString() };
-    store.users.push(user);
-    store.notify();
-    setCreated({ ...user, password });
-    setNewUser({ name: '', email: '', phone: '', position: '', role: 'manager' });
+  const handleCreate = async () => {
     setError('');
+    if (!nd.name.trim() || !nd.email.trim()) { setError('Заполните ФИО и email'); return; }
+    setCreating(true);
+    try {
+      const { user, password } = await store.createUser(nd);
+      setCreated({ ...user, password });
+      setNd({ name: '', email: '', phone: '', position: '', role: 'manager' });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCreating(false);
+    }
   };
+
+  const closeCreate = () => { setShowCreate(false); setCreated(null); setError(''); };
 
   return (
-    <div className="users-page">
+    <div className="fade-in">
       <PageHeader
         title="Пользователи"
         subtitle="Управление учётными записями системы"
@@ -57,16 +55,15 @@ export default function UsersPage() {
       />
 
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
-        <input className="search-bar" value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="🔍  Поиск по имени или email..." />
+        <input className="search-bar" value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍  Поиск по имени, email, организации..." />
       </div>
 
       <Tabs
         tabs={[
-          { id: 'all',     label: 'Все',              count: counts.all     },
-          { id: 'admin',   label: 'Администраторы',   count: counts.admin   },
-          { id: 'manager', label: 'Лаборанты',        count: counts.manager },
-          { id: 'client',  label: 'Клиенты',          count: counts.client  },
+          { id: 'all', label: 'Все', count: store.users.length },
+          { id: 'admins', label: 'Администраторы', count: count('admin') },
+          { id: 'managers', label: 'Заведующие', count: count('manager') },
+          { id: 'clients', label: 'Клиенты', count: count('client') },
         ]}
         active={tab}
         onChange={setTab}
@@ -74,7 +71,7 @@ export default function UsersPage() {
 
       <div className="users-list">
         {filtered.length === 0 ? (
-          <div className="users-list__empty">Пользователей не найдено</div>
+          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-sub)' }}>Пользователей не найдено</div>
         ) : filtered.map(u => (
           <div key={u.id} className="user-row">
             <div className="user-row__left">
@@ -82,60 +79,75 @@ export default function UsersPage() {
               <div>
                 <div className="user-row__name">{u.name}</div>
                 <div className="user-row__email">{u.email}</div>
-                {u.position && <div className="user-row__position">{u.position}</div>}
+                {u.position && <div className="user-row__pos">{u.position}</div>}
+                {u.orgName && <div className="user-row__pos">🏢 {u.orgName}</div>}
               </div>
             </div>
             <div className="user-row__right">
-              {u.phone && <span className="user-row__phone">{u.phone}</span>}
+              {u.phone && <span style={{ fontSize: '0.78rem', color: 'var(--text-sub)' }}>{u.phone}</span>}
               <Badge color={ROLE_COLOR[u.role]}>{ROLE_LABEL[u.role]}</Badge>
               {u.role === 'client' && (
                 <Badge color={u.verified ? 'green' : 'yellow'}>
-                  {u.verified ? '✓ Верифицирован' : '⏳ Не верифицирован'}
+                  {u.verified ? '✓ Верифицирован' : '⏳ Ожидает'}
                 </Badge>
               )}
-              <span className="user-row__date">
-                {format(new Date(u.createdAt), 'd MMM yyyy', { locale: ru })}
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
+                {new Date(u.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })}
               </span>
             </div>
           </div>
         ))}
       </div>
 
-      <Modal open={showCreate} onClose={() => { setShowCreate(false); setCreated(null); setError(''); }}
-        title="Создать пользователя">
+      {/* Create user modal */}
+      <Modal open={showCreate} onClose={closeCreate} title="Создать пользователя">
         {created ? (
-          <div className="create-user-success">
-            <div className="create-user-success__banner">
-              <div className="create-user-success__icon">✅</div>
-              <div className="create-user-success__title">Пользователь создан!</div>
+          <>
+            <div style={{ background: 'var(--green-dim)', border: '1px solid rgba(60,201,138,0.3)', borderRadius: 'var(--radius-sm)', padding: '14px', textAlign: 'center' }}>
+              <div style={{ fontSize: '1.5rem', marginBottom: '6px' }}>✅</div>
+              <div style={{ fontWeight: 700 }}>Пользователь создан!</div>
             </div>
-            <div className="create-user-credentials">
-              <div className="create-user-credentials__row">
-                <span className="create-user-credentials__label">Email:</span>
-                <strong className="create-user-credentials__value">{created.email}</strong>
+            <div className="creds-box">
+              <div className="creds-box__row">
+                <span className="creds-box__label">Email:</span>
+                <strong>{created.email}</strong>
               </div>
-              <div className="create-user-credentials__row">
-                <span className="create-user-credentials__label">Пароль:</span>
-                <strong className="create-user-credentials__password">{created.password}</strong>
+              <div className="creds-box__row">
+                <span className="creds-box__label">Роль:</span>
+                <Badge color={ROLE_COLOR[created.role]}>{ROLE_LABEL[created.role]}</Badge>
+              </div>
+              <div className="creds-box__row">
+                <span className="creds-box__label">Пароль:</span>
+                <span className="creds-box__pass">{created.password}</span>
               </div>
             </div>
-            <p className="create-user-hint" style={{ textAlign: 'center' }}>Сохраните и передайте данные пользователю!</p>
-            <Button onClick={() => { setShowCreate(false); setCreated(null); }} className="btn--full">Закрыть</Button>
-          </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-sub)', textAlign: 'center' }}>
+              ⚠️ Сохраните пароль — он больше не будет показан
+            </p>
+            <Button onClick={closeCreate} className="btn--full">Закрыть</Button>
+          </>
         ) : (
-          <div className="create-user-form">
-            <Input label="ФИО *"       value={newUser.name}     onChange={set('name')}     placeholder="Иванов Иван Иванович" />
-            <Input label="Email *"     type="email" value={newUser.email}    onChange={set('email')}    placeholder="user@lab.ru" />
-            <Input label="Телефон"     type="tel"   value={newUser.phone}    onChange={set('phone')}    placeholder="+7..." />
-            <Input label="Должность"              value={newUser.position} onChange={set('position')} placeholder="Старший лаборант" />
-            <Select label="Роль"      value={newUser.role}     onChange={set('role')}     options={['admin', 'manager']} />
-            {error && <div className="login-error">{error}</div>}
-            <p className="create-user-hint">Пароль будет сгенерирован автоматически</p>
+          <>
+            <Input label="ФИО *" value={nd.name} onChange={setF('name')} placeholder="Иванов Иван Иванович" />
+            <Input label="Email *" type="email" value={nd.email} onChange={setF('email')} placeholder="user@csee.kz" />
+            <Input label="Телефон" type="tel" value={nd.phone} onChange={setF('phone')} placeholder="+7 (___) ___-__-__" />
+            <Input label="Должность" value={nd.position} onChange={setF('position')} placeholder="Заведующий лабораторией" />
+            <Select
+              label="Роль"
+              value={nd.role}
+              onChange={setF('role')}
+              options={[
+                { value: 'admin', label: 'Администратор' },
+                { value: 'manager', label: 'Заведующий' },
+              ]}
+            />
+            {error && <div style={{ background: 'var(--red-dim)', border: '1px solid rgba(247,89,89,0.3)', borderRadius: 'var(--radius-sm)', padding: '10px', fontSize: '0.875rem', color: 'var(--red)' }}>⚠️ {error}</div>}
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>Пароль будет сгенерирован автоматически</p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <Button variant="secondary" onClick={() => setShowCreate(false)}>Отмена</Button>
-              <Button onClick={handleCreate}>+ Создать</Button>
+              <Button variant="secondary" onClick={closeCreate}>Отмена</Button>
+              <Button onClick={handleCreate} disabled={creating}>{creating ? 'Создаём...' : '+ Создать'}</Button>
             </div>
-          </div>
+          </>
         )}
       </Modal>
     </div>

@@ -2,101 +2,87 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, Badge, StatusBadge, Button, Tabs, EmptyState } from '../components/ui';
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { PageHeader, StatusBadge, Button, Tabs, EmptyState } from '../components/ui';
 import '../styles/pages.css';
 
 export default function ApplicationsPage() {
-  const store    = useStore();
-  const user     = store.currentUser;
+  const store = useStore();
+  const user = store.currentUser;
   const navigate = useNavigate();
-  const [search,       setSearch]       = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [tab, setTab] = useState('all');
 
-  const allApps = user.role === 'client'
-    ? store.getApplicationsForClient(user.id)
-    : user.role === 'manager'
-    ? store.getApplicationsForManager(user.id)
-    : store.getAllApplications();
+  const base = user.role === 'client' ? store.getApplicationsForClient(user.id)
+    : user.role === 'manager' ? store.getApplicationsForManager(user.id)
+      : store.getAllApplications();
 
-  const filtered = allApps.filter(app => {
-    const program = store.getProgramById(app.programId);
-    const client  = store.getUserById(app.clientId);
-    const matchSearch = !search
-      || app.sampleCode.toLowerCase().includes(search.toLowerCase())
-      || program?.name.toLowerCase().includes(search.toLowerCase())
-      || client?.name.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === 'all' || app.status === statusFilter;
-    return matchSearch && matchStatus;
+  // Group tabs
+  const inProgress = ['accepted', 'draft_sent', 'signed', 'active', 'in_progress', 'completed', 'samples_sent', 'samples_received', 'protocol_uploaded', 'processing'];
+
+  const filtered = base.filter(app => {
+    const prog = store.getProgramById(app.programId);
+    const client = store.getUserById(app.clientId);
+    const q = search.toLowerCase();
+    const matchQ = !search
+      || app.appNumber.toLowerCase().includes(q)
+      || prog?.name.toLowerCase().includes(q)
+      || client?.name.toLowerCase().includes(q)
+      || client?.orgName?.toLowerCase().includes(q);
+    const matchTab = tab === 'all' ? true
+      : tab === 'new' ? app.status === 'submitted'
+        : tab === 'active' ? inProgress.includes(app.status)
+          : tab === 'finished' ? app.status === 'finished'
+            : tab === 'rejected' ? app.status === 'rejected'
+              : true;
+    return matchQ && matchTab;
   });
 
-  const counts = {
-    all:      allApps.length,
-    pending:  allApps.filter(a => a.status === 'pending').length,
-    signed:   allApps.filter(a => a.status === 'signed').length,
-    rejected: allApps.filter(a => a.status === 'rejected').length,
-  };
+  const c = s => base.filter(a => s(a)).length;
+
+  const tabDefs = [
+    { id: 'all', label: 'Все', count: base.length },
+    { id: 'new', label: 'Новые', count: c(a => a.status === 'submitted') },
+    { id: 'active', label: 'В процессе', count: c(a => inProgress.includes(a.status)) },
+    { id: 'finished', label: 'Завершённые', count: c(a => a.status === 'finished') },
+    { id: 'rejected', label: 'Отклонённые', count: c(a => a.status === 'rejected') },
+  ];
 
   return (
-    <div className="apps-page">
+    <div className="fade-in">
       <PageHeader
-        title={user.role === 'client' ? 'Мои заявки' : user.role === 'manager' ? 'Заявки' : 'Все заявки'}
-        subtitle={user.role === 'client' ? 'Список ваших поданных заявок и их статусы' : 'Управление заявками клиентов'}
+        title={user.role === 'manager' ? 'Мои задания' : user.role === 'client' ? 'Мои заявки' : 'Все заявки'}
+        subtitle={user.role === 'manager' ? 'Задания, назначенные вам администратором' : user.role === 'client' ? 'Ваши заявки на участие в программах ПК' : 'Управление заявками участников'}
         actions={user.role === 'client' && <Button onClick={() => navigate('/programs')}>+ Новая заявка</Button>}
       />
 
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
-        <input
-          className="search-bar"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="🔍  Поиск по коду, программе, клиенту..."
-        />
+        <input className="search-bar" value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="🔍  Поиск по номеру, программе, организации..." />
       </div>
 
-      <Tabs
-        tabs={[
-          { id: 'all',      label: 'Все',              count: counts.all      },
-          { id: 'pending',  label: 'На рассмотрении',  count: counts.pending  },
-          { id: 'signed',   label: 'Подписанные',       count: counts.signed   },
-          { id: 'rejected', label: 'Отклонённые',       count: counts.rejected },
-        ]}
-        active={statusFilter}
-        onChange={setStatusFilter}
-      />
+      <Tabs tabs={tabDefs} active={tab} onChange={setTab} />
 
       {filtered.length === 0 ? (
-        <EmptyState icon="📭" title="Заявок не найдено"
-          subtitle={search ? 'Попробуйте изменить параметры поиска' : 'Здесь пока пусто'} />
+        <EmptyState icon="📭" title="Заявок не найдено" subtitle={search ? 'Попробуйте изменить параметры поиска' : 'Здесь пока пусто'} />
       ) : (
         <div className="apps-list">
           {filtered.map((app, i) => {
-            const program = store.getProgramById(app.programId);
-            const client  = store.getUserById(app.clientId);
-            const manager = store.getUserById(app.assignedManagerId);
+            const prog = store.getProgramById(app.programId);
+            const client = store.getUserById(app.clientId);
+            const mgr = store.getUserById(app.assignedManagerId);
             return (
-              <div
-                key={app.id}
-                className="app-card"
-                onClick={() => navigate(`/applications/${app.id}`)}
-                style={{ animationDelay: `${i * 0.03}s` }}
-              >
+              <div key={app.id} className="app-card" onClick={() => navigate(`/applications/${app.id}`)} style={{ animationDelay: `${i * 0.03}s` }}>
                 <div className="app-card__inner">
                   <div className="app-card__left">
-                    <div className="app-card__icon">{program?.icon}</div>
+                    <div className="app-card__prog-icon">{prog?.icon}</div>
                     <div className="app-card__info">
-                      <div className="app-card__badges">
-                        <span className="app-card__code">{app.sampleCode}</span>
-                        {app.protocolReady && <Badge color="purple">🧪 Протокол готов</Badge>}
-                        {app.resultReady   && <Badge color="green">📄 Заключение готово</Badge>}
-                      </div>
-                      <div className="app-card__name">{program?.name}</div>
+                      <div className="app-card__number">{app.appNumber}</div>
+                      <div className="app-card__name">{prog?.name}</div>
                       <div className="app-card__meta">
-                        {user.role !== 'client' && client && <span className="app-card__meta-item">👤 {client.name}</span>}
-                        {manager && <span className="app-card__meta-item">🔬 {manager.name}</span>}
-                        <span className="app-card__date">
-                          {format(new Date(app.createdAt), 'd MMM yyyy', { locale: ru })}
+                        {user.role !== 'client' && <span className="app-card__meta-item">🏢 {client?.orgName || client?.name}</span>}
+                        {mgr && <span className="app-card__meta-item">👤 {mgr.name}</span>}
+                        <span className="app-card__meta-item">
+                          {new Date(app.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })}
                         </span>
                       </div>
                     </div>

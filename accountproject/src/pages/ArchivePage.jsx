@@ -2,108 +2,156 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, Badge, Tabs, StatusBadge } from '../components/ui';
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { PageHeader, Badge, Tabs, StatusBadge, EmptyState } from '../components/ui';
+import { APPLICATION_STATUSES } from '../data/store';
 import '../styles/pages.css';
 
-const TYPE_CONFIG = {
-  application:  { icon: '📋', color: 'var(--accent)',  label: 'Заявка',      badgeColor: 'blue'   },
-  protocol:     { icon: '🧪', color: 'var(--purple)', label: 'Протокол',    badgeColor: 'purple' },
-  result:       { icon: '📄', color: 'var(--green)',   label: 'Заключение',  badgeColor: 'green'  },
-  notification: { icon: '🔔', color: 'var(--yellow)',  label: 'Уведомление', badgeColor: 'yellow' },
+const TYPE_CFG = {
+  application: { icon: '📋', color: 'var(--accent)', bg: 'rgba(79,142,247,0.12)', badgeColor: 'blue', label: 'Заявка' },
+  status_event: { icon: '🔄', color: 'var(--yellow)', bg: 'rgba(245,197,66,0.12)', badgeColor: 'yellow', label: 'Статус' },
+  notification: { icon: '🔔', color: 'var(--purple)', bg: 'rgba(164,127,255,0.12)', badgeColor: 'purple', label: 'Уведомление' },
+  contract: { icon: '📝', color: 'var(--cyan)', bg: 'rgba(56,189,248,0.12)', badgeColor: 'cyan', label: 'Договор' },
+  document: { icon: '📦', color: 'var(--green)', bg: 'rgba(60,201,138,0.12)', badgeColor: 'green', label: 'Документ' },
 };
 
 export default function ArchivePage() {
-  const store    = useStore();
+  const store = useStore();
   const navigate = useNavigate();
   const [tab, setTab] = useState('all');
+  const [search, setSearch] = useState('');
 
-  const allEntries = [
-    ...store.getAllApplications().map(a => ({ type: 'application',  data: a, time: a.createdAt })),
-    ...store.protocols.map(p =>           ({ type: 'protocol',     data: p, time: p.createdAt })),
-    ...store.results.map(r =>             ({ type: 'result',       data: r, time: r.createdAt })),
-    ...store.notifications.map(n =>       ({ type: 'notification', data: n, time: n.createdAt })),
-  ].sort((a, b) => new Date(b.time) - new Date(a.time));
+  // Build flat log from all sources
+  const entries = [];
 
-  const filtered = tab === 'all' ? allEntries : allEntries.filter(e => e.type === tab.replace('s', '').replace('notification', 'notification'));
+  store.getAllApplications().forEach(app => {
+    const prog = store.getProgramById(app.programId);
+    const client = store.getUserById(app.clientId);
 
-  const tabMap = { applications: 'application', protocols: 'protocol', results: 'result', notifications: 'notification' };
-  const filteredByTab = tab === 'all' ? allEntries : allEntries.filter(e => e.type === tabMap[tab]);
+    // Application creation
+    entries.push({
+      type: 'application', time: app.createdAt, appId: app.id,
+      title: `Подана заявка ${app.appNumber}`,
+      sub: `${prog?.name} · ${client?.orgName || client?.name}`,
+      badge: <StatusBadge status={app.status} />,
+    });
 
-  const handleClick = (entry) => {
-    if (entry.type === 'application')  navigate(`/applications/${entry.data.id}`);
-    if (entry.type === 'protocol')     navigate(`/applications/${entry.data.applicationId}`);
-    if (entry.type === 'result')       navigate(`/applications/${entry.data.applicationId}`);
-  };
+    // Each timeline event
+    app.timeline.forEach(ev => {
+      const cfg = APPLICATION_STATUSES[ev.status];
+      const byUser = store.getUserById(ev.by);
+      entries.push({
+        type: 'status_event', time: ev.date, appId: app.id,
+        title: `${app.appNumber}: статус → «${cfg?.label || ev.status}»`,
+        sub: `${byUser?.name || ev.by}${ev.note ? ` · ${ev.note}` : ''}`,
+        badge: cfg ? <Badge color={cfg.color}>{cfg.label}</Badge> : null,
+      });
+    });
 
-  const getEntryInfo = (entry) => {
-    if (entry.type === 'application') {
-      const prog   = store.getProgramById(entry.data.programId);
-      const client = store.getUserById(entry.data.clientId);
-      return { title: prog?.name || '—', sub: `Клиент: ${client?.name}`, code: entry.data.sampleCode };
-    }
-    if (entry.type === 'protocol') {
-      const app = store.applications.find(a => a.id === entry.data.applicationId);
-      const mgr = store.getUserById(entry.data.managerId);
-      return { title: `Протокол по заявке ${app?.sampleCode}`, sub: `Лаборант: ${mgr?.name}`, code: app?.sampleCode };
-    }
-    if (entry.type === 'result') {
-      const app = store.applications.find(a => a.id === entry.data.applicationId);
-      const adm = store.getUserById(entry.data.adminId);
-      return { title: `Заключение по заявке ${app?.sampleCode}`, sub: `Администратор: ${adm?.name}`, code: app?.sampleCode };
-    }
-    return { title: entry.data.message, sub: `Получатели: ${entry.data.targetIds.length} чел.`, code: null };
-  };
+    // Contract files
+    if (app.draftContractUrl) entries.push({
+      type: 'contract', time: app.updatedAt, appId: app.id,
+      title: `Драфт договора: ${app.draftContractUrl}`,
+      sub: app.appNumber,
+    });
+    if (app.signedContractUrl) entries.push({
+      type: 'contract', time: app.updatedAt, appId: app.id,
+      title: `Подписанный договор: ${app.signedContractUrl}`,
+      sub: app.appNumber,
+    });
+
+    // Final documents
+    if (app.conclusionUrl) entries.push({
+      type: 'document', time: app.updatedAt, appId: app.id,
+      title: `Заключение: ${app.conclusionUrl}`,
+      sub: app.appNumber,
+    });
+    if (app.reportUrl) entries.push({
+      type: 'document', time: app.updatedAt, appId: app.id,
+      title: `Отчёт: ${app.reportUrl}`,
+      sub: app.appNumber,
+    });
+    if (app.certificateUrl) entries.push({
+      type: 'document', time: app.updatedAt, appId: app.id,
+      title: `Свидетельство: ${app.certificateUrl}`,
+      sub: app.appNumber,
+    });
+  });
+
+  // Notifications
+  store.allNotifications.forEach(n => {
+    entries.push({
+      type: 'notification', time: n.createdAt, appId: n.relatedId,
+      title: n.message,
+      sub: `${n.targetIds.length} получателей`,
+    });
+  });
+
+  // Sort by time descending
+  entries.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+  const tabMap = { applications: 'application', statuses: 'status_event', contracts: 'contract', documents: 'document', notifications: 'notification' };
+
+  const filtered = entries.filter(e => {
+    const matchTab = tab === 'all' || e.type === tabMap[tab];
+    const q = search.toLowerCase();
+    const matchSearch = !search || e.title.toLowerCase().includes(q) || e.sub?.toLowerCase().includes(q);
+    return matchTab && matchSearch;
+  });
+
+  const count = t => entries.filter(e => e.type === tabMap[t]).length;
+
+  const fmtDate = d => new Date(d).toLocaleString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
   return (
-    <div className="archive-page">
-      <PageHeader title="Архив / Журнал событий"
-        subtitle="Полная история всех операций системы, отсортированная по времени" />
+    <div className="fade-in">
+      <PageHeader title="Архив / Журнал событий" subtitle={`Всего записей: ${entries.length}`} />
+
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+        <input className="search-bar" value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍  Поиск по событиям..." />
+      </div>
+
       <Tabs
         tabs={[
-          { id: 'all',           label: 'Все события',  count: allEntries.length },
-          { id: 'applications',  label: 'Заявки',       count: allEntries.filter(e => e.type === 'application').length  },
-          { id: 'protocols',     label: 'Протоколы',    count: allEntries.filter(e => e.type === 'protocol').length     },
-          { id: 'results',       label: 'Заключения',   count: allEntries.filter(e => e.type === 'result').length       },
-          { id: 'notifications', label: 'Уведомления',  count: allEntries.filter(e => e.type === 'notification').length },
+          { id: 'all', label: 'Все', count: entries.length },
+          { id: 'applications', label: 'Заявки', count: count('applications') },
+          { id: 'statuses', label: 'Статусы', count: count('statuses') },
+          { id: 'contracts', label: 'Договоры', count: count('contracts') },
+          { id: 'documents', label: 'Документы', count: count('documents') },
+          { id: 'notifications', label: 'Уведомления', count: count('notifications') },
         ]}
         active={tab}
         onChange={setTab}
       />
-      <div className="archive-list">
-        {filteredByTab.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-sub)' }}>Записей нет</div>
-        ) : filteredByTab.map((entry, i) => {
-          const cfg  = TYPE_CONFIG[entry.type];
-          const info = getEntryInfo(entry);
-          const clickable = entry.type !== 'notification';
-          return (
-            <div
-              key={`${entry.type}-${entry.data.id}`}
-              onClick={() => handleClick(entry)}
-              className={`archive-item${clickable ? ' archive-item--clickable' : ''}`}
-              style={{ animationDelay: `${(i % 20) * 0.025}s` }}
-            >
-              <div className="archive-item__icon-wrap" style={{ background: `${cfg.color}15` }}>
-                {cfg.icon}
-              </div>
-              <div className="archive-item__body">
-                <div className="archive-item__badges">
-                  <Badge color={cfg.badgeColor} className="badge--xs">{cfg.label}</Badge>
-                  {entry.type === 'application' && <StatusBadge status={entry.data.status} />}
-                  {info.code && <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)', fontFamily: 'var(--font-main)', fontWeight: 700 }}>{info.code}</span>}
+
+      {filtered.length === 0 ? (
+        <EmptyState icon="🗄️" title="Записей не найдено" />
+      ) : (
+        <div className="archive-list">
+          {filtered.map((e, i) => {
+            const cfg = TYPE_CFG[e.type] || TYPE_CFG.notification;
+            return (
+              <div
+                key={i}
+                onClick={() => e.appId && navigate(`/applications/${e.appId}`)}
+                className={`archive-item${e.appId ? ' archive-item--link' : ''}`}
+              >
+                <div className="archive-item__icon" style={{ background: cfg.bg, color: cfg.color, borderRadius: '8px', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', flexShrink: 0 }}>
+                  {cfg.icon}
                 </div>
-                <div className="archive-item__title">{info.title}</div>
-                {info.sub && <div className="archive-item__sub">{info.sub}</div>}
+                <div className="archive-item__body">
+                  <div className="archive-item__row">
+                    <Badge color={cfg.badgeColor} className="badge--xs">{cfg.label}</Badge>
+                    {e.badge}
+                  </div>
+                  <div className="archive-item__title">{e.title}</div>
+                  {e.sub && <div className="archive-item__sub">{e.sub}</div>}
+                </div>
+                <div className="archive-item__time">{fmtDate(e.time)}</div>
               </div>
-              <div className="archive-item__time">
-                {format(new Date(entry.time), 'd MMM yyyy HH:mm', { locale: ru })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

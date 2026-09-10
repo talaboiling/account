@@ -2,65 +2,55 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Button, Badge, StatusBadge, Modal, Select, Textarea, InfoRow, Alert } from '../components/ui';
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import {
+  Button, Badge, StatusBadge, Modal, Textarea,
+  InfoRow, Alert, SectionBox, FileUpload, FileLink, StepTracker, Timeline
+} from '../components/ui';
+import { APPLICATION_STATUSES, TOUR_STATUSES } from '../data/store';
 import '../styles/pages.css';
 
-function Section({ title, icon, children }) {
-  return (
-    <div className="detail-section">
-      <div className="detail-section__head">
-        <span>{icon}</span>
-        <h3 className="detail-section__title">{title}</h3>
-      </div>
-      <div className="detail-section__body">{children}</div>
-    </div>
-  );
-}
+// Steps 1–9 are managed at tour level; 10–12 are individual
+const GROUP_STEPS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 export default function ApplicationDetailPage() {
-  const store    = useStore();
-  const { id }   = useParams();
+  const store = useStore();
+  const { id } = useParams();
   const navigate = useNavigate();
-  const user     = store.currentUser;
-  const app      = store.applications.find(a => a.id === id);
+  const user = store.currentUser;
+  const app = store.getAppById(id);
 
-  const [modalSign,     setModalSign]     = useState(false);
-  const [modalReject,   setModalReject]   = useState(false);
-  const [modalProtocol, setModalProtocol] = useState(false);
-  const [modalResult,   setModalResult]   = useState(false);
-  const [adminNote,     setAdminNote]     = useState(app?.adminNote || '');
-  const [selectedMgr,   setSelectedMgr]   = useState(app?.assignedManagerId || '');
-  const [protocolText,  setProtocolText]  = useState('');
-  const [resultText,    setResultText]    = useState('');
-  const [rejectNote,    setRejectNote]    = useState('');
+  const [modal, setModal] = useState(null);
+  const [note, setNote] = useState('');
+  const [draftFile, setDraftFile] = useState('');
+  const [finalDocs, setFinalDocs] = useState({ conclusionUrl: '', reportUrl: '', certificateUrl: '' });
 
   if (!app) return <div style={{ padding: '40px', color: 'var(--red)' }}>Заявка не найдена</div>;
 
-  const program  = store.getProgramById(app.programId);
-  const client   = store.getUserById(app.clientId);
-  const manager  = store.getUserById(app.assignedManagerId);
-  const protocol = store.getProtocolByAppId(app.id);
-  const result   = store.getResultByAppId(app.id);
-  const managers = store.getManagers();
-  const fmtFields= store.programForms[app.programId] || [];
+  const prog = store.getProgramById(app.programId);
+  const client = store.getUserById(app.clientId);
+  const mgr = store.getUserById(app.assignedManagerId);
+  const tour = app.tourId ? store.getTourById(app.tourId) : null;
 
-  const canAdmin   = user.role === 'admin';
-  const canManager = user.role === 'manager' && app.assignedManagerId === user.id;
-  const canClient  = user.role === 'client'  && app.clientId === user.id;
+  const isAdmin = user.role === 'admin';
+  const isClient = user.role === 'client' && app.clientId === user.id;
 
-  const handleSign = () => {
-    store.updateApplicationStatus(app.id, 'signed', adminNote, selectedMgr || undefined);
-    if (selectedMgr) store.assignManager(app.id, selectedMgr);
-    setModalSign(false);
+  const step = APPLICATION_STATUSES[app.status]?.step || 0;
+  const isGroupStep = GROUP_STEPS.includes(step);
+
+  const closeModal = () => { setModal(null); setNote(''); setDraftFile(''); setFinalDocs({ conclusionUrl: '', reportUrl: '', certificateUrl: '' }); };
+
+  const doAccept = () => { store.acceptApplication(app.id, user.id, note).catch(() => {}); closeModal(); };
+  const doReject = () => { if (!note.trim()) return; store.rejectApplication(app.id, user.id, note).catch(() => {}); closeModal(); };
+  const doAttachDraft = () => { if (!draftFile) return; store.attachDraftContract(app.id, user.id, draftFile).catch(() => {}); closeModal(); };
+  const doUploadSigned = fn => store.uploadSignedContract(app.id, user.id, fn).catch(() => {});
+  const doConfirmSamples = () => store.confirmSamplesReceived(app.id, user.id).catch(() => {});
+  const doUploadProtocol = fn => store.uploadProtocol(app.id, user.id, fn).catch(() => {});
+  const doProcessing = () => { store.setProcessingStatus(app.id, user.id, note).catch(() => {}); closeModal(); };
+  const doFinalDocs = () => {
+    if (!finalDocs.conclusionUrl || !finalDocs.reportUrl || !finalDocs.certificateUrl) return;
+    store.uploadFinalDocuments(app.id, user.id, finalDocs).catch(() => {});
+    closeModal();
   };
-  const handleReject       = () => { store.updateApplicationStatus(app.id, 'rejected', rejectNote); setModalReject(false); };
-  const handleProtocol     = () => { store.createProtocol(app.id, user.id, protocolText); setModalProtocol(false); };
-  const handleResult       = () => { store.createResult(app.id, user.id, resultText); setModalResult(false); };
-  const handleSendProtocol = () => store.sendProtocolToClient(app.id, user.id);
-  const handleConfirmProto = () => store.confirmProtocolDelivery(app.id, user.id);
-  const handleConfirmResult= () => result && store.confirmResultDelivery(result.id, user.id);
 
   return (
     <div className="detail-page">
@@ -69,149 +59,239 @@ export default function ApplicationDetailPage() {
       {/* Header */}
       <div className="detail-header">
         <div className="detail-header__left">
-          <div className="detail-header__icon">{program?.icon}</div>
+          <div className="detail-header__icon">{prog?.icon}</div>
           <div>
-            <div className="detail-header__code">{app.sampleCode}</div>
-            <h2 className="detail-header__title">{program?.name}</h2>
+            <div className="detail-header__number">
+              {app.appNumber}
+              {tour && (
+                <span
+                  onClick={e => { e.stopPropagation(); navigate(`/tours/${tour.id}`); }}
+                  style={{ marginLeft: '8px', cursor: 'pointer', color: 'var(--cyan)', fontWeight: 700 }}
+                >
+                  · {tour.tourNumber} ↗
+                </span>
+              )}
+            </div>
+            <h2 className="detail-header__title">{prog?.name}</h2>
             <div className="detail-header__date">
-              Подана {format(new Date(app.createdAt), 'd MMMM yyyy в HH:mm', { locale: ru })}
+              Подана {new Date(app.createdAt).toLocaleString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
             </div>
           </div>
         </div>
         <div className="detail-header__badges">
           <StatusBadge status={app.status} />
-          {app.protocolReady && <Badge color="purple">🧪 Протокол</Badge>}
-          {app.resultReady   && <Badge color="green">📄 Заключение</Badge>}
+          {isGroupStep && tour && <Badge color="cyan">Групповой этап</Badge>}
+          {!isGroupStep && step > 9 && <Badge color="purple">Индивидуальный этап</Badge>}
         </div>
       </div>
 
-      {/* Action alerts */}
-      {canAdmin && app.status === 'pending' && (
-        <Alert color="yellow" text="⏳ Заявка ожидает вашего решения">
-          <Button variant="success" onClick={() => setModalSign(true)}>✓ Подписать</Button>
-          <Button variant="danger"  onClick={() => setModalReject(true)}>✗ Отклонить</Button>
-        </Alert>
+      {/* Step tracker */}
+      <StepTracker currentStep={step} />
+
+      {/* Tour context note */}
+      {tour && isGroupStep && (
+        <div style={{ background: 'var(--cyan-dim)', border: '1px solid rgba(56,189,248,0.25)', borderRadius: 'var(--radius-sm)', padding: '10px 14px', marginBottom: '14px', fontSize: '0.82rem', color: 'var(--cyan)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span>🗂️</span>
+          <span>Этапы 1–9 управляются на уровне тура <strong
+            style={{ cursor: 'pointer', textDecoration: 'underline' }}
+            onClick={() => navigate(`/tours/${tour.id}`)}>
+            {tour.tourNumber}
+          </strong>. После получения образцов протокол подаётся индивидуально.</span>
+        </div>
       )}
-      {canManager && app.status === 'signed' && !app.protocolReady && (
-        <Alert color="purple" text="🔬 Создайте протокол по результатам исследования">
-          <Button onClick={() => setModalProtocol(true)}>🧪 Создать протокол</Button>
-        </Alert>
-      )}
-      {canAdmin && app.protocolReady && !app.protocolDelivered && protocol?.status !== 'delivered' && (
-        <Alert color="blue" text="📤 Протокол готов — отправьте его клиенту">
-          <Button onClick={handleSendProtocol}>📨 Отправить клиенту</Button>
-        </Alert>
-      )}
-      {canClient && protocol?.status === 'sent' && !app.protocolDelivered && (
-        <Alert color="blue" text="📬 Протокол отправлен вам — подтвердите получение">
-          <Button onClick={handleConfirmProto}>✓ Подтвердить получение</Button>
-        </Alert>
-      )}
-      {canAdmin && app.protocolDelivered && !app.resultReady && (
-        <Alert color="green" text="✅ Протокол доставлен — создайте итоговое заключение">
-          <Button variant="success" onClick={() => setModalResult(true)}>📄 Создать заключение</Button>
-        </Alert>
-      )}
-      {canClient && result && !result.clientConfirmed && (
-        <Alert color="green" text="📄 Итоговое заключение готово — подтвердите получение">
-          <Button variant="success" onClick={handleConfirmResult}>✓ Получено</Button>
+
+      {/* ── ACTION BANNERS ── */}
+
+      {/* ADMIN: step 2 — accept */}
+      {isAdmin && app.status === 'submitted' && (
+        <Alert color="yellow" text="⏳ Заявка ожидает принятия">
+          <Button variant="success" onClick={() => setModal('accept')}>✓ Принять</Button>
+          <Button variant="danger" onClick={() => setModal('reject')}>✗ Отклонить</Button>
         </Alert>
       )}
 
-      {/* Sections */}
-      <Section title="Информация о клиенте" icon="👤">
-        <InfoRow label="ФИО"          value={client?.name} />
-        <InfoRow label="Email"        value={client?.email} />
-        <InfoRow label="Телефон"      value={client?.phone} />
-        <InfoRow label="Организация"  value={client?.orgName} />
-      </Section>
-
-      <Section title="Данные заявки" icon="📋">
-        {fmtFields.map(field => (
-          <InfoRow key={field.id} label={field.label} value={app.formData[field.id]} />
-        ))}
-        {app.adminNote && <InfoRow label="Примечание администратора" value={app.adminNote} />}
-      </Section>
-
-      {(canAdmin || manager) && (
-        <Section title="Назначение" icon="🔬">
-          <InfoRow label="Лаборант"  value={manager ? manager.name : '—'} />
-          {manager && <InfoRow label="Должность" value={manager.position} />}
-        </Section>
+      {/* ADMIN: step 3 — draft contract */}
+      {isAdmin && app.status === 'accepted' && (
+        <Alert color="cyan" text="📄 Прикрепите драфт договора для этого участника">
+          <Button onClick={() => setModal('draft')}>📎 Прикрепить драфт</Button>
+          <Button variant="danger" onClick={() => setModal('reject')}>✗ Отклонить</Button>
+        </Alert>
       )}
 
-      {protocol && (
-        <Section title="Протокол испытаний" icon="🧪">
-          <InfoRow label="Дата создания" value={format(new Date(protocol.createdAt), 'd MMMM yyyy', { locale: ru })} />
-          <InfoRow label="Лаборант"      value={store.getUserById(protocol.managerId)?.name} />
-          <InfoRow label="Статус"        value={
-            protocol.status === 'delivered' ? '✅ Доставлен клиенту' :
-            protocol.status === 'sent'      ? '📤 Отправлен' : '🔄 Ожидает отправки'
-          } />
-          <div style={{ marginTop: '12px' }}>
-            <div className="protocol-text__label">Содержание протокола</div>
-            <pre className="protocol-text">{protocol.content}</pre>
+      {/* CLIENT: step 4 — sign contract */}
+      {isClient && app.status === 'draft_sent' && app.draftContractUrl && (
+        <Alert color="cyan" text="📄 Ознакомьтесь с драфтом договора и загрузите подписанный экземпляр">
+          <FileUpload onUpload={doUploadSigned} current={app.signedContractUrl} />
+        </Alert>
+      )}
+
+      {/* ADMIN: tour not started yet but app is signed */}
+      {isAdmin && app.status === 'signed' && tour && tour.status === 'forming' && (
+        <Alert color="green" text={`✅ Договор подписан. Тур ${tour.tourNumber} ещё в стадии набора — запустите тур на странице тура.`}>
+          <Button onClick={() => navigate(`/tours/${tour.id}`)}>🗂️ Перейти к туру</Button>
+        </Alert>
+      )}
+
+      {/* CLIENT: step 9 — confirm samples */}
+      {isClient && app.status === 'samples_sent' && (
+        <Alert color="blue" text="📦 Образцы отправлены — подтвердите получение">
+          <Button variant="success" onClick={doConfirmSamples}>✓ Подтвердить получение</Button>
+        </Alert>
+      )}
+
+      {/* CLIENT: step 10 — upload protocol (INDIVIDUAL from here) */}
+      {isClient && app.status === 'samples_received' && (
+        <Alert color="purple" text="🔬 Образцы получены — прикрепите протокол испытаний (индивидуально)">
+          <FileUpload onUpload={doUploadProtocol} current={app.protocolUrl} />
+        </Alert>
+      )}
+
+      {/* ADMIN: step 11 — accept protocol for processing */}
+      {isAdmin && app.status === 'protocol_uploaded' && (
+        <Alert color="purple" text="📋 Клиент прикрепил протокол — примите в обработку">
+          <Button onClick={() => setModal('processing')}>⚙️ Принять в обработку</Button>
+        </Alert>
+      )}
+
+      {/* ADMIN: step 12 — upload final docs */}
+      {isAdmin && app.status === 'processing' && (
+        <Alert color="green" text="📦 Загрузите итоговые документы: заключение, отчёт, свидетельство">
+          <Button variant="success" onClick={() => setModal('final')}>📎 Загрузить документы</Button>
+        </Alert>
+      )}
+
+      {/* ── SECTIONS ── */}
+
+      {/* Application form */}
+      <SectionBox title="Данные заявки (Ф-02-ВП-31)" icon="📋">
+        <InfoRow label="Объект испытаний" value={app.formData.objectName} />
+        <InfoRow label="Определяемые показатели" value={app.formData.indicators} />
+        <InfoRow label="Диапазон измерений" value={app.formData.measureRange} />
+        <InfoRow label="Нормативный документ" value={app.formData.normDoc} />
+        <InfoRow label="Структурное подразделение" value={app.formData.deptName} />
+        <InfoRow label="Аттестат аккредитации" value={app.formData.accreditCert || '—'} />
+        <InfoRow label="Руководитель подразделения" value={app.formData.headName} />
+        <InfoRow label="Контакты руководителя" value={app.formData.headContact} />
+        <InfoRow label="Организация / реквизиты" value={app.formData.orgDetails} />
+        <InfoRow label="Руководитель организации" value={app.formData.directorName} />
+      </SectionBox>
+
+      {/* Client info (admin only) */}
+      {isAdmin && (
+        <SectionBox title="Клиент" icon="🏢">
+          <InfoRow label="ФИО" value={client?.name} />
+          <InfoRow label="Организация" value={client?.orgName} />
+          <InfoRow label="Email" value={client?.email} />
+          <InfoRow label="Телефон" value={client?.phone} />
+        </SectionBox>
+      )}
+
+      {/* Tour info */}
+      {tour && (
+        <SectionBox title="Тур" icon="🗂️">
+          <InfoRow label="Номер тура" value={tour.tourNumber} />
+          <InfoRow label="Статус тура" value={TOUR_STATUSES[tour.status]?.label || tour.status} />
+          {mgr && <InfoRow label="Заведующий" value={`${mgr.name} — ${mgr.position}`} />}
+          {tour.taskNote && <InfoRow label="Задание" value={tour.taskNote} />}
+          <InfoRow label="Участников в туре" value={`${store.getAppsInTour(tour.id).length} организаций`} />
+          {isAdmin && (
+            <div style={{ marginTop: '10px' }}>
+              <Button variant="ghost" size="sm" onClick={() => navigate(`/tours/${tour.id}`)}>
+                🗂️ Открыть страницу тура →
+              </Button>
+            </div>
+          )}
+        </SectionBox>
+      )}
+
+      {/* Contract docs */}
+      {(app.draftContractUrl || app.signedContractUrl) && (
+        <SectionBox title="Договор" icon="📝">
+          {app.draftContractUrl && (
+            <div className="file-row" style={{ marginBottom: '8px' }}>
+              <span className="file-row__icon">📄</span>
+              <span className="file-row__name">Драфт: <FileLink value={app.draftContractUrl} /></span>
+              <Badge color="cyan" className="file-row__badge">Драфт</Badge>
+            </div>
+          )}
+          {app.signedContractUrl && (
+            <div className="file-row">
+              <span className="file-row__icon">✅</span>
+              <span className="file-row__name">Подписан: <FileLink value={app.signedContractUrl} /></span>
+              <Badge color="green" className="file-row__badge">Подписан</Badge>
+            </div>
+          )}
+        </SectionBox>
+      )}
+
+      {/* Protocol */}
+      {app.protocolUrl && (
+        <SectionBox title="Протокол испытаний" icon="🔬">
+          <div className="file-row">
+            <span className="file-row__icon">📋</span>
+            <span className="file-row__name"><FileLink value={app.protocolUrl} /></span>
+            <Badge color="purple" className="file-row__badge">От клиента</Badge>
           </div>
-        </Section>
+        </SectionBox>
       )}
 
-      {result && (
-        <Section title="Итоговое заключение" icon="📄">
-          <InfoRow label="Дата создания" value={format(new Date(result.createdAt), 'd MMMM yyyy', { locale: ru })} />
-          <InfoRow label="Статус" value={result.clientConfirmed ? '✅ Клиент подтвердил получение' : '📤 Отправлено клиенту'} />
-          <div style={{ marginTop: '12px' }}>
-            <div className="protocol-text__label">Содержание заключения</div>
-            <pre className="protocol-text">{result.content}</pre>
-          </div>
-        </Section>
+      {/* Final documents */}
+      {(app.conclusionUrl || app.reportUrl || app.certificateUrl) && (
+        <SectionBox title="Итоговые документы" icon="📦">
+          {app.conclusionUrl && <div className="file-row" style={{ marginBottom: '6px' }}><span className="file-row__icon">📄</span><span className="file-row__name">Заключение: <FileLink value={app.conclusionUrl} /></span><Badge color="green" className="file-row__badge">✓</Badge></div>}
+          {app.reportUrl && <div className="file-row" style={{ marginBottom: '6px' }}><span className="file-row__icon">📊</span><span className="file-row__name">Отчёт: <FileLink value={app.reportUrl} /></span><Badge color="green" className="file-row__badge">✓</Badge></div>}
+          {app.certificateUrl && <div className="file-row"><span className="file-row__icon">🏅</span><span className="file-row__name">Свидетельство: <FileLink value={app.certificateUrl} /></span><Badge color="green" className="file-row__badge">✓</Badge></div>}
+        </SectionBox>
       )}
 
-      {/* Modals */}
-      <Modal open={modalSign} onClose={() => setModalSign(false)} title="Подписать заявку">
-        <div className="create-user-form">
-          <Select label="Назначить лаборанта" value={selectedMgr}
-            onChange={e => setSelectedMgr(e.target.value)} options={managers.map(m => m.name)} />
-          <Textarea label="Примечание (необязательно)" value={adminNote}
-            onChange={e => setAdminNote(e.target.value)} placeholder="Комментарий к заявке..." />
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-            <Button variant="secondary" onClick={() => setModalSign(false)}>Отмена</Button>
-            <Button variant="success" onClick={handleSign}>✓ Подписать</Button>
-          </div>
+      {/* Timeline */}
+      <SectionBox title="История статусов" icon="🕐">
+        <Timeline items={[...app.timeline].reverse()} store={store} />
+      </SectionBox>
+
+      {/* MODALS */}
+      <Modal open={modal === 'accept'} onClose={closeModal} title="Принять заявку">
+        <Textarea label="Комментарий (необязательно)" value={note} onChange={e => setNote(e.target.value)} placeholder="Напр.: Заявка соответствует требованиям программы." />
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+          <Button variant="secondary" onClick={closeModal}>Отмена</Button>
+          <Button variant="success" onClick={doAccept}>✓ Принять</Button>
         </div>
       </Modal>
 
-      <Modal open={modalReject} onClose={() => setModalReject(false)} title="Отклонить заявку">
-        <div className="create-user-form">
-          <Textarea label="Причина отклонения *" value={rejectNote}
-            onChange={e => setRejectNote(e.target.value)} placeholder="Укажите причину..." />
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-            <Button variant="secondary" onClick={() => setModalReject(false)}>Отмена</Button>
-            <Button variant="danger" onClick={handleReject}>✗ Отклонить</Button>
-          </div>
+      <Modal open={modal === 'reject'} onClose={closeModal} title="Отклонить заявку">
+        <Textarea label="Причина отклонения *" value={note} onChange={e => setNote(e.target.value)} placeholder="Укажите причину..." />
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+          <Button variant="secondary" onClick={closeModal}>Отмена</Button>
+          <Button variant="danger" onClick={doReject} disabled={!note.trim()}>✗ Отклонить</Button>
         </div>
       </Modal>
 
-      <Modal open={modalProtocol} onClose={() => setModalProtocol(false)} title="Создать протокол испытаний" width={640}>
-        <div className="create-user-form">
-          <Textarea label="Содержание протокола *" value={protocolText}
-            onChange={e => setProtocolText(e.target.value)}
-            placeholder={`Протокол испытаний №ПИ-${new Date().getFullYear()}-000\n\nОбразец: ...\nМетоды: ...\n\nРезультаты:\n- ...\n\nЗАКЛЮЧЕНИЕ: ...`} />
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-            <Button variant="secondary" onClick={() => setModalProtocol(false)}>Отмена</Button>
-            <Button onClick={handleProtocol} disabled={!protocolText.trim()}>🧪 Создать протокол</Button>
-          </div>
+      <Modal open={modal === 'draft'} onClose={closeModal} title="Прикрепить драфт договора">
+        <FileUpload label="Файл драфта *" onUpload={name => setDraftFile(name)} current={draftFile} />
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+          <Button variant="secondary" onClick={closeModal}>Отмена</Button>
+          <Button onClick={doAttachDraft} disabled={!draftFile}>📎 Прикрепить</Button>
         </div>
       </Modal>
 
-      <Modal open={modalResult} onClose={() => setModalResult(false)} title="Создать итоговое заключение" width={640}>
-        <div className="create-user-form">
-          <Textarea label="Содержание заключения *" value={resultText}
-            onChange={e => setResultText(e.target.value)}
-            placeholder={`ЗАКЛЮЧЕНИЕ №З-${new Date().getFullYear()}-000\n\nНа основании проведённых исследований:\n\n...\n\nВывод: ...`} />
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-            <Button variant="secondary" onClick={() => setModalResult(false)}>Отмена</Button>
-            <Button variant="success" onClick={handleResult} disabled={!resultText.trim()}>📄 Создать заключение</Button>
-          </div>
+      <Modal open={modal === 'processing'} onClose={closeModal} title="Принять протокол в обработку">
+        <Textarea label="Комментарий клиенту (необязательно)" value={note} onChange={e => setNote(e.target.value)} placeholder="Напр.: Протокол получен. Срок обработки — 5 рабочих дней." />
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+          <Button variant="secondary" onClick={closeModal}>Отмена</Button>
+          <Button onClick={doProcessing}>⚙️ Принять в обработку</Button>
+        </div>
+      </Modal>
+
+      <Modal open={modal === 'final'} onClose={closeModal} title="Загрузить итоговые документы" width={580}>
+        <FileUpload label="Заключение *" onUpload={n => setFinalDocs(d => ({ ...d, conclusionUrl: n }))} current={finalDocs.conclusionUrl} />
+        <FileUpload label="Отчёт *" onUpload={n => setFinalDocs(d => ({ ...d, reportUrl: n }))} current={finalDocs.reportUrl} />
+        <FileUpload label="Свидетельство *" onUpload={n => setFinalDocs(d => ({ ...d, certificateUrl: n }))} current={finalDocs.certificateUrl} />
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+          <Button variant="secondary" onClick={closeModal}>Отмена</Button>
+          <Button variant="success" onClick={doFinalDocs}
+            disabled={!finalDocs.conclusionUrl || !finalDocs.reportUrl || !finalDocs.certificateUrl}>
+            📦 Отправить клиенту
+          </Button>
         </div>
       </Modal>
     </div>
