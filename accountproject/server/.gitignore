@@ -1,6 +1,5 @@
 node_modules
-data/*.sqlite
-data/*.sqlite-journal
+data/*.sqlite*
 uploads/*
 !uploads/.gitkeep
 .env
