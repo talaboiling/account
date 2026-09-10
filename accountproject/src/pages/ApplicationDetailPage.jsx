@@ -4,7 +4,7 @@ import { useStore } from '../context/StoreContext';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Button, Badge, StatusBadge, Modal, Textarea,
-  InfoRow, Alert, SectionBox, FileUpload, StepTracker, Timeline
+  InfoRow, Alert, SectionBox, FileUpload, FileLink, StepTracker, Timeline
 } from '../components/ui';
 import { APPLICATION_STATUSES, TOUR_STATUSES } from '../data/store';
 import '../styles/pages.css';
@@ -39,16 +39,16 @@ export default function ApplicationDetailPage() {
 
   const closeModal = () => { setModal(null); setNote(''); setDraftFile(''); setFinalDocs({ conclusionUrl: '', reportUrl: '', certificateUrl: '' }); };
 
-  const doAccept = () => { store.acceptApplication(app.id, user.id, note); closeModal(); };
-  const doReject = () => { if (!note.trim()) return; store.rejectApplication(app.id, user.id, note); closeModal(); };
-  const doAttachDraft = () => { if (!draftFile) return; store.attachDraftContract(app.id, user.id, draftFile); closeModal(); };
-  const doUploadSigned = fn => store.uploadSignedContract(app.id, user.id, fn);
-  const doConfirmSamples = () => store.confirmSamplesReceived(app.id, user.id);
-  const doUploadProtocol = fn => store.uploadProtocol(app.id, user.id, fn);
-  const doProcessing = () => { store.setProcessingStatus(app.id, user.id, note); closeModal(); };
+  const doAccept = () => { store.acceptApplication(app.id, user.id, note).catch(() => {}); closeModal(); };
+  const doReject = () => { if (!note.trim()) return; store.rejectApplication(app.id, user.id, note).catch(() => {}); closeModal(); };
+  const doAttachDraft = () => { if (!draftFile) return; store.attachDraftContract(app.id, user.id, draftFile).catch(() => {}); closeModal(); };
+  const doUploadSigned = fn => store.uploadSignedContract(app.id, user.id, fn).catch(() => {});
+  const doConfirmSamples = () => store.confirmSamplesReceived(app.id, user.id).catch(() => {});
+  const doUploadProtocol = fn => store.uploadProtocol(app.id, user.id, fn).catch(() => {});
+  const doProcessing = () => { store.setProcessingStatus(app.id, user.id, note).catch(() => {}); closeModal(); };
   const doFinalDocs = () => {
     if (!finalDocs.conclusionUrl || !finalDocs.reportUrl || !finalDocs.certificateUrl) return;
-    store.uploadFinalDocuments(app.id, user.id, finalDocs);
+    store.uploadFinalDocuments(app.id, user.id, finalDocs).catch(() => {});
     closeModal();
   };
 
@@ -210,14 +210,14 @@ export default function ApplicationDetailPage() {
           {app.draftContractUrl && (
             <div className="file-row" style={{ marginBottom: '8px' }}>
               <span className="file-row__icon">📄</span>
-              <span className="file-row__name">Драфт: {app.draftContractUrl}</span>
+              <span className="file-row__name">Драфт: <FileLink value={app.draftContractUrl} /></span>
               <Badge color="cyan" className="file-row__badge">Драфт</Badge>
             </div>
           )}
           {app.signedContractUrl && (
             <div className="file-row">
               <span className="file-row__icon">✅</span>
-              <span className="file-row__name">Подписан: {app.signedContractUrl}</span>
+              <span className="file-row__name">Подписан: <FileLink value={app.signedContractUrl} /></span>
               <Badge color="green" className="file-row__badge">Подписан</Badge>
             </div>
           )}
@@ -229,7 +229,7 @@ export default function ApplicationDetailPage() {
         <SectionBox title="Протокол испытаний" icon="🔬">
           <div className="file-row">
             <span className="file-row__icon">📋</span>
-            <span className="file-row__name">{app.protocolUrl}</span>
+            <span className="file-row__name"><FileLink value={app.protocolUrl} /></span>
             <Badge color="purple" className="file-row__badge">От клиента</Badge>
           </div>
         </SectionBox>
@@ -238,9 +238,9 @@ export default function ApplicationDetailPage() {
       {/* Final documents */}
       {(app.conclusionUrl || app.reportUrl || app.certificateUrl) && (
         <SectionBox title="Итоговые документы" icon="📦">
-          {app.conclusionUrl && <div className="file-row" style={{ marginBottom: '6px' }}><span className="file-row__icon">📄</span><span className="file-row__name">Заключение: {app.conclusionUrl}</span><Badge color="green" className="file-row__badge">✓</Badge></div>}
-          {app.reportUrl && <div className="file-row" style={{ marginBottom: '6px' }}><span className="file-row__icon">📊</span><span className="file-row__name">Отчёт: {app.reportUrl}</span><Badge color="green" className="file-row__badge">✓</Badge></div>}
-          {app.certificateUrl && <div className="file-row"><span className="file-row__icon">🏅</span><span className="file-row__name">Свидетельство: {app.certificateUrl}</span><Badge color="green" className="file-row__badge">✓</Badge></div>}
+          {app.conclusionUrl && <div className="file-row" style={{ marginBottom: '6px' }}><span className="file-row__icon">📄</span><span className="file-row__name">Заключение: <FileLink value={app.conclusionUrl} /></span><Badge color="green" className="file-row__badge">✓</Badge></div>}
+          {app.reportUrl && <div className="file-row" style={{ marginBottom: '6px' }}><span className="file-row__icon">📊</span><span className="file-row__name">Отчёт: <FileLink value={app.reportUrl} /></span><Badge color="green" className="file-row__badge">✓</Badge></div>}
+          {app.certificateUrl && <div className="file-row"><span className="file-row__icon">🏅</span><span className="file-row__name">Свидетельство: <FileLink value={app.certificateUrl} /></span><Badge color="green" className="file-row__badge">✓</Badge></div>}
         </SectionBox>
       )}
 

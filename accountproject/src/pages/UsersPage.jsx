@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { PageHeader, Badge, Tabs, Modal, Input, Select, Button } from '../components/ui';
-import { v4 as uuidv4 } from 'uuid';
 import '../styles/pages.css';
 
 const ROLE_LABEL = { admin: 'Администратор', manager: 'Заведующий', client: 'Клиент' };
@@ -16,6 +15,7 @@ export default function UsersPage() {
   const [nd, setNd] = useState({ name: '', email: '', phone: '', position: '', role: 'manager' });
   const [created, setCreated] = useState(null);
   const [error, setError] = useState('');
+  const [creating, setCreating] = useState(false);
 
   const setF = k => e => setNd(f => ({ ...f, [k]: e.target.value }));
 
@@ -29,16 +29,19 @@ export default function UsersPage() {
 
   const count = r => store.users.filter(u => u.role === r).length;
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     setError('');
     if (!nd.name.trim() || !nd.email.trim()) { setError('Заполните ФИО и email'); return; }
-    if (store.users.find(u => u.email === nd.email)) { setError('Email уже используется'); return; }
-    const password = `Pass${Math.floor(1000 + Math.random() * 9000)}!`;
-    const user = { id: uuidv4(), ...nd, password, verified: true, createdAt: new Date().toISOString() };
-    store.users.push(user);
-    store.notify();
-    setCreated({ ...user, password });
-    setNd({ name: '', email: '', phone: '', position: '', role: 'manager' });
+    setCreating(true);
+    try {
+      const { user, password } = await store.createUser(nd);
+      setCreated({ ...user, password });
+      setNd({ name: '', email: '', phone: '', position: '', role: 'manager' });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCreating(false);
+    }
   };
 
   const closeCreate = () => { setShowCreate(false); setCreated(null); setError(''); };
@@ -142,7 +145,7 @@ export default function UsersPage() {
             <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>Пароль будет сгенерирован автоматически</p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <Button variant="secondary" onClick={closeCreate}>Отмена</Button>
-              <Button onClick={handleCreate}>+ Создать</Button>
+              <Button onClick={handleCreate} disabled={creating}>{creating ? 'Создаём...' : '+ Создать'}</Button>
             </div>
           </>
         )}

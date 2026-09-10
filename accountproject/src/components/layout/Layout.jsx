@@ -1,5 +1,5 @@
 // src/components/layout/Layout.jsx
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Badge } from '../ui';
@@ -36,6 +36,13 @@ export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    if (!store.error) return;
+    const t = setTimeout(() => store.clearError(), 6000);
+    return () => clearTimeout(t);
+  }, [store.error, store]);
+
   if (!user) return null;
 
   const nav = NAV[user.role] || NAV.client;
@@ -93,7 +100,15 @@ export default function Layout({ children }) {
           <aside className="sidebar sidebar--mobile" onClick={e => e.stopPropagation()}><SidebarInner /></aside>
         </div>
       )}
-      <main className="main-content">{children}</main>
+      <main className="main-content">
+        {store.error && (
+          <div className="alert alert--red" style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+            <span>⚠️ {store.error}</span>
+            <button className="modal__close" onClick={() => store.clearError()}>×</button>
+          </div>
+        )}
+        {children}
+      </main>
     </div>
   );
 }

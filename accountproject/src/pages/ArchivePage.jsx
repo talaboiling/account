@@ -78,7 +78,7 @@ export default function ArchivePage() {
   });
 
   // Notifications
-  store.notifications.forEach(n => {
+  store.allNotifications.forEach(n => {
     entries.push({
       type: 'notification', time: n.createdAt, appId: n.relatedId,
       title: n.message,

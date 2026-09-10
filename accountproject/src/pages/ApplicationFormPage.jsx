@@ -29,6 +29,7 @@ export default function ApplicationFormPage() {
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(null);
+  const [submitError, setSubmitError] = useState('');
 
   if (!program) return <div style={{ padding: '40px', color: 'var(--red)' }}>Программа не найдена</div>;
 
@@ -47,11 +48,16 @@ export default function ApplicationFormPage() {
     e.preventDefault();
     if (!validate()) return;
     setSubmitting(true);
-    await new Promise(r => setTimeout(r, 600));
-    const app = store.submitApplication(user.id, programId, { ...fd });
-    setSuccess(app.appNumber);
-    setSubmitting(false);
-    setTimeout(() => navigate('/applications'), 2500);
+    setSubmitError('');
+    try {
+      const app = await store.submitApplication(user.id, programId, { ...fd });
+      setSuccess(app.appNumber);
+      setTimeout(() => navigate('/applications'), 2500);
+    } catch (err) {
+      setSubmitError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (success) return (
@@ -153,6 +159,8 @@ export default function ApplicationFormPage() {
           />
 
         </div>
+
+        {submitError && <div className="auth-error" style={{ marginBottom: '12px' }}>⚠️ {submitError}</div>}
 
         <div className="form-actions">
           <Button variant="secondary" onClick={() => navigate('/programs')}>Отмена</Button>

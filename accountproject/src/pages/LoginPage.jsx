@@ -15,8 +15,7 @@ export default function LoginPage() {
 
   const handleSubmit = async e => {
     e.preventDefault(); setError(''); setLoading(true);
-    await new Promise(r => setTimeout(r, 350));
-    const res = store.login(email, pass);
+    const res = await store.login(email, pass);
     setLoading(false);
     if (res.error) { setError(res.error); return; }
     navigate('/dashboard');

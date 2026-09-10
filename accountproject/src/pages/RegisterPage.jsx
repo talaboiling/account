@@ -19,9 +19,8 @@ export default function RegisterPage() {
 
   const handleRegister = async e => {
     e.preventDefault(); setError(''); setLoading(true);
-    await new Promise(r => setTimeout(r, 350));
     const { email, password, name, orgName, phone } = form;
-    const res = store.registerClient({ email, password, name, orgName, phone });
+    const res = await store.registerClient({ email, password, name, orgName, phone });
     setLoading(false);
     if (res.error) { setError(res.error); return; }
     setDevCode(res.verificationCode);
@@ -30,8 +29,7 @@ export default function RegisterPage() {
 
   const handleVerify = async e => {
     e.preventDefault(); setError(''); setLoading(true);
-    await new Promise(r => setTimeout(r, 350));
-    const res = store.verifyEmail(form.email, code);
+    const res = await store.verifyEmail(form.email, code);
     setLoading(false);
     if (res.error) { setError(res.error); return; }
     navigate('/login');

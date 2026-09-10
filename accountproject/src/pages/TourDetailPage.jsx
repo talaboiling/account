@@ -41,17 +41,17 @@ export default function TourDetailPage() {
 
   const doStart = () => {
     if (!managerId || !taskNote.trim()) return;
-    store.startTour(tour.id, user.id, managerId, taskNote);
+    store.startTour(tour.id, user.id, managerId, taskNote).catch(() => {});
     closeModal();
   };
 
   const doWorkStatus = () => {
-    store.updateTourWorkStatus(tour.id, user.id, workStatus, note);
+    store.updateTourWorkStatus(tour.id, user.id, workStatus, note).catch(() => {});
     closeModal();
   };
 
   const doSamplesSent = () => {
-    store.notifyTourSamplesSent(tour.id, user.id, note);
+    store.notifyTourSamplesSent(tour.id, user.id, note).catch(() => {});
     closeModal();
   };
 

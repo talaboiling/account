@@ -1,7 +1,8 @@
 // src/components/ui.jsx
-import React from 'react';
+import React, { useState } from 'react';
 import '../styles/ui.css';
 import { APPLICATION_STATUSES } from '../data/store';
+import { api } from '../api/client';
 
 export function Button({ children, variant = 'primary', size = 'md', onClick, disabled, type = 'button', className = '' }) {
   return <button type={type} onClick={onClick} disabled={disabled} className={`btn btn--${size} btn--${variant} ${className}`}>{children}</button>;
@@ -134,30 +135,58 @@ export function SectionBox({ title, icon, children }) {
   );
 }
 
-// Simulated file upload — returns a fake filename
+// Uploads the picked file to the backend and hands the caller back the
+// served URL (stored as the "…Url" field on applications) plus the
+// original filename (kept only for the label shown here).
 export function FileUpload({ label, onUpload, accept = '.pdf,.doc,.docx', current }) {
-  const handleChange = e => {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+  const [pickedName, setPickedName] = useState('');
+
+  const handleChange = async e => {
     const file = e.target.files?.[0];
-    if (file) onUpload(file.name);
+    e.target.value = '';
+    if (!file) return;
+    setError(''); setUploading(true);
+    try {
+      const { url } = await api.uploadFile(file);
+      setPickedName(file.name);
+      onUpload(url);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUploading(false);
+    }
   };
+
   return (
     <div className="field">
       {label && <span className="field__label">{label}</span>}
       {current && (
         <div className="file-row" style={{ marginBottom: '8px' }}>
           <span className="file-row__icon">📎</span>
-          <span className="file-row__name">{current}</span>
+          <span className="file-row__name">{pickedName || current}</span>
           <Badge color="green" className="file-row__badge">Загружен</Badge>
         </div>
       )}
-      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '9px 16px', background: 'var(--bg-card2)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text-sub)', transition: 'all var(--transition)' }}
+      {error && <div className="field__error" style={{ marginBottom: '6px' }}>{error}</div>}
+      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '9px 16px', background: 'var(--bg-card2)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)', cursor: uploading ? 'wait' : 'pointer', fontSize: '0.875rem', color: 'var(--text-sub)', transition: 'all var(--transition)', opacity: uploading ? 0.6 : 1 }}
         onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--text)'; }}
         onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-sub)'; }}>
-        <span>📁</span> {current ? 'Заменить файл' : 'Выбрать файл'}
-        <input type="file" accept={accept} onChange={handleChange} style={{ display: 'none' }} />
+        <span>📁</span> {uploading ? 'Загрузка...' : current ? 'Заменить файл' : 'Выбрать файл'}
+        <input type="file" accept={accept} onChange={handleChange} disabled={uploading} style={{ display: 'none' }} />
       </label>
     </div>
   );
+}
+
+// Renders a stored document reference as a real download link when it's a
+// server-uploaded file, or as plain text for the historical demo filenames.
+export function FileLink({ value }) {
+  if (!value) return null;
+  return value.startsWith('/uploads/')
+    ? <a href={value} target="_blank" rel="noreferrer">Открыть файл ↗</a>
+    : <span>{value}</span>;
 }
 
 // Step progress tracker

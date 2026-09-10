@@ -20,13 +20,15 @@ import UsersPage from './pages/UsersPage';
 function Guard({ children, roles }) {
   const store = useStore();
   const user = store.currentUser;
+  if (store.bootstrapping) return null;
   if (!user) return <Navigate to="/login" replace />;
   if (roles && !roles.includes(user.role)) return <Navigate to="/dashboard" replace />;
   return <Layout>{children}</Layout>;
 }
 
 function AppRoutes() {
-  const { currentUser: user } = useStore();
+  const { currentUser: user, bootstrapping } = useStore();
+  if (bootstrapping) return null;
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <LoginPage />} />

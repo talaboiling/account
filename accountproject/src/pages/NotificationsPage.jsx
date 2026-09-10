@@ -27,7 +27,7 @@ export default function NotificationsPage() {
   const unread = notifs.filter(n => !n.read).length;
 
   const handleClick = n => {
-    store.markNotificationRead(n.id);
+    store.markNotificationRead(n.id).catch(() => {});
     if (!n.relatedId) return;
     const app = store.applications.find(a => a.id === n.relatedId);
     if (app) navigate(`/applications/${app.id}`);
@@ -49,7 +49,7 @@ export default function NotificationsPage() {
         title="Уведомления"
         subtitle={unread > 0 ? `${unread} непрочитанных` : 'Все прочитаны'}
         actions={unread > 0 && (
-          <Button variant="ghost" size="sm" onClick={() => store.markAllRead(user.id)}>
+          <Button variant="ghost" size="sm" onClick={() => store.markAllRead(user.id).catch(() => {})}>
             ✓ Прочитать все
           </Button>
         )}
