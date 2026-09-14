@@ -20,6 +20,24 @@ export const APPLICATION_STATUSES = {
   rejected: { label: 'Отклонена', color: 'red', step: 0 },
 };
 
+// ─── CLIENT-FACING STATUS LABELS ──────────────────────────────────────────
+// Clients never see tours (their existence, numbers, or work-status
+// granularity) — the tour-organization phase (active/in_progress/completed)
+// is shown to clients as a single umbrella status.
+const CLIENT_STATUS_OVERRIDES = {
+  active: { label: 'Организация тура ППК', color: 'blue' },
+  in_progress: { label: 'Организация тура ППК', color: 'blue' },
+  completed: { label: 'Организация тура ППК', color: 'blue' },
+  finished: { label: 'Отчёт получен', color: 'green' },
+};
+
+export function getApplicationStatusLabel(status, viewerRole) {
+  if (viewerRole === 'client' && CLIENT_STATUS_OVERRIDES[status]) {
+    return CLIENT_STATUS_OVERRIDES[status];
+  }
+  return APPLICATION_STATUSES[status] || { label: status, color: 'default' };
+}
+
 // ─── TOUR STATUSES ────────────────────────────────────────────────────────
 export const TOUR_STATUSES = {
   forming: { label: 'Набор участников', color: 'yellow' },
@@ -104,10 +122,10 @@ const seedApplications = [
     protocolUrl: null, conclusionUrl: null, reportUrl: null, certificateUrl: null,
     timeline: [
       { status: 'submitted', date: '2024-03-01T09:00:00Z', by: 'client-1', note: '' },
-      { status: 'accepted', date: '2024-03-02T10:00:00Z', by: 'admin-1', note: 'Принята. Включена в ТУР-2024-001.' },
+      { status: 'accepted', date: '2024-03-02T10:00:00Z', by: 'admin-1', note: 'Принята.' },
       { status: 'draft_sent', date: '2024-03-03T11:00:00Z', by: 'admin-1', note: '' },
       { status: 'signed', date: '2024-03-04T14:00:00Z', by: 'client-1', note: '' },
-      { status: 'active', date: '2024-03-06T09:00:00Z', by: 'admin-1', note: 'Тур ТУР-2024-001 запущен.' },
+      { status: 'active', date: '2024-03-06T09:00:00Z', by: 'admin-1', note: 'Начата организация тура ППК.' },
     ],
     createdAt: '2024-03-01T09:00:00Z',
     updatedAt: '2024-03-06T09:00:00Z',
@@ -163,10 +181,10 @@ const seedApplications = [
     protocolUrl: null, conclusionUrl: null, reportUrl: null, certificateUrl: null,
     timeline: [
       { status: 'submitted', date: '2024-03-01T10:00:00Z', by: 'client-3', note: '' },
-      { status: 'accepted', date: '2024-03-02T10:30:00Z', by: 'admin-1', note: 'Принята. Включена в ТУР-2024-001.' },
+      { status: 'accepted', date: '2024-03-02T10:30:00Z', by: 'admin-1', note: 'Принята.' },
       { status: 'draft_sent', date: '2024-03-03T11:30:00Z', by: 'admin-1', note: '' },
       { status: 'signed', date: '2024-03-05T09:00:00Z', by: 'client-3', note: '' },
-      { status: 'active', date: '2024-03-06T09:00:00Z', by: 'admin-1', note: 'Тур ТУР-2024-001 запущен.' },
+      { status: 'active', date: '2024-03-06T09:00:00Z', by: 'admin-1', note: 'Начата организация тура ППК.' },
     ],
     createdAt: '2024-03-01T10:00:00Z',
     updatedAt: '2024-03-06T09:00:00Z',
@@ -176,7 +194,9 @@ const seedApplications = [
 const seedNotifications = [
   { id: 'n1', type: 'app_submitted', targetIds: ['admin-1', 'admin-2'], relatedId: 'app-1', message: 'Новая заявка ЗАЯ-2024-001 от ТОО «АналитЛаб»', read: true, createdAt: '2024-03-01T09:00:00Z' },
   { id: 'n2', type: 'app_submitted', targetIds: ['admin-1', 'admin-2'], relatedId: 'app-3', message: 'Новая заявка ЗАЯ-2024-003 от РГП «КазЛабСтандарт»', read: true, createdAt: '2024-03-01T10:00:00Z' },
-  { id: 'n3', type: 'tour_started', targetIds: ['client-1', 'client-3', 'mgr-1'], relatedId: 'tour-1', message: 'Тур ТУР-2024-001 запущен. Программа: ДНК животного в пищевых продуктах.', read: true, createdAt: '2024-03-06T09:00:00Z' },
+  { id: 'n3', type: 'tour_started', targetIds: ['mgr-1'], relatedId: 'tour-1', message: 'Тур ТУР-2024-001 запущен. Программа: ДНК животного в пищевых продуктах.', read: true, createdAt: '2024-03-06T09:00:00Z' },
+  { id: 'n3a', type: 'status_changed', targetIds: ['client-1'], relatedId: 'app-1', message: 'Заявка ЗАЯ-2024-001: начат этап «Организация тура ППК».', read: true, createdAt: '2024-03-06T09:00:00Z' },
+  { id: 'n3b', type: 'status_changed', targetIds: ['client-3'], relatedId: 'app-3', message: 'Заявка ЗАЯ-2024-003: начат этап «Организация тура ППК».', read: true, createdAt: '2024-03-06T09:00:00Z' },
   { id: 'n4', type: 'app_submitted', targetIds: ['admin-1', 'admin-2'], relatedId: 'app-2', message: 'Новая заявка ЗАЯ-2024-002 от ИП Морозова С.Д.', read: false, createdAt: '2024-03-10T14:00:00Z' },
 ];
 
@@ -285,9 +305,7 @@ class Store {
   acceptApplication(appId, adminId, note = '') {
     this._transitionApp(appId, 'accepted', adminId, note);
     const app = this.getAppById(appId);
-    const tour = this.getTourById(app.tourId);
-    this._notifyClient(app, 'status_changed',
-      `Ваша заявка ${app.appNumber} принята.${tour ? ` Тур: ${tour.tourNumber}.` : ''}`);
+    this._notifyClient(app, 'status_changed', `Ваша заявка ${app.appNumber} принята.`);
   }
 
   // Step 3: Admin sends draft contract to individual client
@@ -320,20 +338,26 @@ class Store {
     tour.updatedAt = new Date().toISOString();
     tour.timeline.push({ status: 'active', date: new Date().toISOString(), by: adminId, note: `Заведующий: ${this.getUserById(managerId)?.name}. ${taskNote}` });
 
-    // Update all signed apps in this tour to 'active'
+    // Update all signed apps in this tour to 'active'. Clients never see
+    // tours — each affected client gets a per-application notification with
+    // no tour number/identifier; only the manager and admins get the
+    // tour-aware notification.
     const appsInTour = this.getAppsInTour(tourId);
-    const clientIds = [];
+    const startedApps = [];
     appsInTour.forEach(app => {
       if (app.status === 'signed') {
         app.assignedManagerId = managerId;
-        this._transitionApp(app.id, 'active', adminId, `Тур ${tour.tourNumber} запущен.`);
-        if (!clientIds.includes(app.clientId)) clientIds.push(app.clientId);
+        this._transitionApp(app.id, 'active', adminId, 'Начата организация тура ППК.');
+        startedApps.push(app);
       }
     });
 
-    // Group notification to all participants + manager
+    startedApps.forEach(app => {
+      this._notifyClient(app, 'status_changed', `Заявка ${app.appNumber}: начат этап «Организация тура ППК».`);
+    });
+
     const prog = this.getProgramById(tour.programId);
-    this._notifyGroup([...clientIds, managerId], 'tour_started', tourId,
+    this._notifyUser(managerId, 'tour_started', tourId,
       `Тур ${tour.tourNumber} запущен. Программа: «${prog?.name}». Участников: ${appsInTour.length}.`);
     this._notifyAdmins('tour_started', tourId, `Тур ${tour.tourNumber} запущен. Участников: ${appsInTour.length}. Заведующий: ${this.getUserById(managerId)?.name}`);
     this.notify();
@@ -369,14 +393,13 @@ class Store {
     tour.timeline.push({ status: 'samples_sent', date: new Date().toISOString(), by: adminId, note });
 
     const appsInTour = this.getAppsInTour(tourId);
-    const clientIds = [...new Set(appsInTour.map(a => a.clientId))];
+    const prog = this.getProgramById(tour.programId);
     appsInTour.forEach(app => {
       this._transitionApp(app.id, 'samples_sent', adminId, note);
+      this._notifyClient(app, 'samples_sent',
+        `Образцы по заявке ${app.appNumber} (${prog?.name}) отправлены. Подтвердите получение.`);
     });
 
-    const prog = this.getProgramById(tour.programId);
-    this._notifyGroup(clientIds, 'samples_sent', tourId,
-      `Тур ${tour.tourNumber} (${prog?.name}): образцы отправлены всем участникам. Подтвердите получение.`);
     this.notify();
   }
 
@@ -450,10 +473,6 @@ class Store {
 
   _notifyUser(userId, type, relatedId, message) {
     this.notifications.unshift({ id: uuidv4(), type, targetIds: [userId], relatedId, message, read: false, createdAt: new Date().toISOString() });
-  }
-
-  _notifyGroup(userIds, type, relatedId, message) {
-    this.notifications.unshift({ id: uuidv4(), type, targetIds: userIds, relatedId, message, read: false, createdAt: new Date().toISOString() });
   }
 
   // ── QUERIES ───────────────────────────────────────────────────────────
