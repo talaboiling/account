@@ -1,7 +1,7 @@
 // src/components/ui.jsx
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import '../styles/ui.css';
-import { APPLICATION_STATUSES } from '../data/store';
+import { getApplicationStatusLabel } from '../data/store';
 import { api } from '../api/client';
 
 export function Button({ children, variant = 'primary', size = 'md', onClick, disabled, type = 'button', className = '' }) {
@@ -12,10 +12,20 @@ export function Badge({ children, color = 'default', className = '' }) {
   return <span className={`badge badge--${color} ${className}`}>{children}</span>;
 }
 
-export function StatusBadge({ status }) {
-  const cfg = APPLICATION_STATUSES[status];
-  if (!cfg) return <Badge color="default">{status}</Badge>;
-  return <Badge color={cfg.color}>{cfg.label}</Badge>;
+export function StatusBadge({ status, role }) {
+  const cfg = getApplicationStatusLabel(status, role);
+  const prevStatus = useRef(status);
+  const [flash, setFlash] = useState(false);
+
+  useEffect(() => {
+    if (prevStatus.current === status) return;
+    prevStatus.current = status;
+    setFlash(true);
+    const t = setTimeout(() => setFlash(false), 600);
+    return () => clearTimeout(t);
+  }, [status]);
+
+  return <Badge color={cfg.color} className={flash ? 'badge--flash' : ''}>{cfg.label}</Badge>;
 }
 
 export function Input({ label, id, error, className = '', ...props }) {
@@ -189,26 +199,47 @@ export function FileLink({ value }) {
     : <span>{value}</span>;
 }
 
+const STEPS_FULL = [
+  { n: 1, label: 'Подана' },
+  { n: 2, label: 'Принята' },
+  { n: 3, label: 'Драфт договора' },
+  { n: 4, label: 'Договор подписан' },
+  { n: 5, label: 'В действии' },
+  { n: 6, label: 'В работе' },
+  { n: 7, label: 'Работа завершена' },
+  { n: 8, label: 'Образцы отправлены' },
+  { n: 9, label: 'Образцы приняты' },
+  { n: 10, label: 'Протокол прикреплён' },
+  { n: 11, label: 'Обработка' },
+  { n: 12, label: 'Завершено' },
+];
+
+// Clients never see tours — steps 5–7 (the tour-organization phase) collapse
+// into one stop, and "finished" reads as a report having been delivered.
+const STEPS_CLIENT = [
+  { n: 1, label: 'Подана' },
+  { n: 2, label: 'Принята' },
+  { n: 3, label: 'Драфт договора' },
+  { n: 4, label: 'Договор подписан' },
+  { n: 5, label: 'Организация тура ППК' },
+  { n: 6, label: 'Образцы отправлены' },
+  { n: 7, label: 'Образцы приняты' },
+  { n: 8, label: 'Протокол прикреплён' },
+  { n: 9, label: 'Обработка' },
+  { n: 10, label: 'Отчёт получен' },
+];
+
+const clientStepFromAppStep = step => (step <= 4 ? step : step <= 7 ? 5 : step - 2);
+
 // Step progress tracker
-export function StepTracker({ currentStep }) {
-  const steps = [
-    { n: 1, label: 'Подана' },
-    { n: 2, label: 'Принята' },
-    { n: 3, label: 'Драфт договора' },
-    { n: 4, label: 'Договор подписан' },
-    { n: 5, label: 'В действии' },
-    { n: 6, label: 'В работе' },
-    { n: 7, label: 'Работа завершена' },
-    { n: 8, label: 'Образцы отправлены' },
-    { n: 9, label: 'Образцы приняты' },
-    { n: 10, label: 'Протокол прикреплён' },
-    { n: 11, label: 'Обработка' },
-    { n: 12, label: 'Завершено' },
-  ];
+export function StepTracker({ currentStep, viewerRole }) {
+  const isClient = viewerRole === 'client';
+  const steps = isClient ? STEPS_CLIENT : STEPS_FULL;
+  const effectiveStep = isClient ? clientStepFromAppStep(currentStep) : currentStep;
   return (
     <div className="step-tracker">
       {steps.map((s, i) => {
-        const state = s.n < currentStep ? 'done' : s.n === currentStep ? 'active' : 'future';
+        const state = s.n < effectiveStep ? 'done' : s.n === effectiveStep ? 'active' : 'future';
         return (
           <div key={s.n} className="step-item">
             <div className="step-item__wrap">
@@ -226,12 +257,11 @@ export function StepTracker({ currentStep }) {
 }
 
 // Timeline of status history
-export function Timeline({ items, store }) {
-  const S = APPLICATION_STATUSES;
+export function Timeline({ items, store, role }) {
   return (
     <div className="timeline">
       {items.map((item, i) => {
-        const cfg = S[item.status] || { label: item.status, color: 'default' };
+        const cfg = getApplicationStatusLabel(item.status, role);
         const user = store.getUserById(item.by);
         const colors = { green: 'var(--green)', blue: 'var(--accent)', yellow: 'var(--yellow)', red: 'var(--red)', purple: 'var(--purple)', cyan: 'var(--cyan)', orange: 'var(--orange)', default: 'var(--text-dim)' };
         const c = colors[cfg.color] || colors.default;

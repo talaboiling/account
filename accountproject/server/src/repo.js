@@ -135,7 +135,7 @@ const notifyAdmins = (type, relatedId, message) => {
 };
 
 const notifyClient = (app, type, message) => createNotification(type, app.id, message, [app.clientId]);
-const notifyGroup = (userIds, type, relatedId, message) => createNotification(type, relatedId, message, userIds);
+const notifyUser = (userId, type, relatedId, message) => createNotification(type, relatedId, message, [userId]);
 
 function markNotificationRead(id, userId) {
   const belongs = db.prepare('SELECT 1 FROM notification_targets WHERE notification_id = ? AND user_id = ?').get(id, userId);
@@ -216,8 +216,7 @@ const submitApplication = db.transaction((clientId, programId, formData) => {
 function acceptApplication(appId, adminId, note) {
   transitionApp(appId, 'accepted', adminId, note);
   const app = getAppById(appId);
-  const tour = app.tourId ? getTourById(app.tourId) : null;
-  notifyClient(app, 'status_changed', `Ваша заявка ${app.appNumber} принята.${tour ? ` Тур: ${tour.tourNumber}.` : ''}`);
+  notifyClient(app, 'status_changed', `Ваша заявка ${app.appNumber} принята.`);
   return app;
 }
 
@@ -246,18 +245,25 @@ const startTour = db.transaction((tourId, adminId, managerId, taskNote) => {
   db.prepare('INSERT INTO tour_timeline (tour_id, status, date, by_user, note, seq) VALUES (?, ?, ?, ?, ?, ?)')
     .run(tourId, 'active', now(), adminId, `Заведующий: ${manager?.name}. ${taskNote}`, seq);
 
+  // Clients never see tours — each affected client gets a per-application
+  // notification with no tour number/identifier; only the manager and
+  // admins get the tour-aware notification.
   const appsInTour = getAppsInTour(tourId);
-  const clientIds = [];
+  const startedApps = [];
   appsInTour.forEach(app => {
     if (app.status === 'signed') {
       db.prepare('UPDATE applications SET assigned_manager_id = ? WHERE id = ?').run(managerId, app.id);
-      transitionApp(app.id, 'active', adminId, `Тур ${tour.tourNumber} запущен.`);
-      if (!clientIds.includes(app.clientId)) clientIds.push(app.clientId);
+      transitionApp(app.id, 'active', adminId, 'Начата организация тура ППК.');
+      startedApps.push(app);
     }
   });
 
+  startedApps.forEach(app => {
+    notifyClient(app, 'status_changed', `Заявка ${app.appNumber}: начат этап «Организация тура ППК».`);
+  });
+
   const prog = getProgramById(tour.programId);
-  notifyGroup([...clientIds, managerId], 'tour_started', tourId,
+  notifyUser(managerId, 'tour_started', tourId,
     `Тур ${tour.tourNumber} запущен. Программа: «${prog?.name}». Участников: ${appsInTour.length}.`);
   notifyAdmins('tour_started', tourId, `Тур ${tour.tourNumber} запущен. Участников: ${appsInTour.length}. Заведующий: ${manager?.name}`);
 
@@ -288,13 +294,14 @@ function notifyTourSamplesSent(tourId, adminId, note) {
     .run(tourId, 'samples_sent', now(), adminId, note || '', seq);
 
   const appsInTour = getAppsInTour(tourId);
-  const clientIds = [...new Set(appsInTour.map(a => a.clientId))];
-  appsInTour.forEach(app => transitionApp(app.id, 'samples_sent', adminId, note));
-
   const tour = getTourById(tourId);
   const prog = getProgramById(tour.programId);
-  notifyGroup(clientIds, 'samples_sent', tourId,
-    `Тур ${tour.tourNumber} (${prog?.name}): образцы отправлены всем участникам. Подтвердите получение.`);
+  appsInTour.forEach(app => {
+    transitionApp(app.id, 'samples_sent', adminId, note);
+    notifyClient(app, 'samples_sent',
+      `Образцы по заявке ${app.appNumber} (${prog?.name}) отправлены. Подтвердите получение.`);
+  });
+
   return tour;
 }
 

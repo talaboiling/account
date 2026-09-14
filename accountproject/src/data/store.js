@@ -22,6 +22,24 @@ export const APPLICATION_STATUSES = {
   rejected: { label: 'Отклонена', color: 'red', step: 0 },
 };
 
+// ─── CLIENT-FACING STATUS LABELS ──────────────────────────────────────────
+// Clients never see tours (their existence, numbers, or work-status
+// granularity) — the tour-organization phase (active/in_progress/completed)
+// is shown to clients as a single umbrella status.
+const CLIENT_STATUS_OVERRIDES = {
+  active: { label: 'Организация тура ППК', color: 'blue' },
+  in_progress: { label: 'Организация тура ППК', color: 'blue' },
+  completed: { label: 'Организация тура ППК', color: 'blue' },
+  finished: { label: 'Отчёт получен', color: 'green' },
+};
+
+export function getApplicationStatusLabel(status, viewerRole) {
+  if (viewerRole === 'client' && CLIENT_STATUS_OVERRIDES[status]) {
+    return CLIENT_STATUS_OVERRIDES[status];
+  }
+  return APPLICATION_STATUSES[status] || { label: status, color: 'default' };
+}
+
 export const TOUR_STATUSES = {
   forming: { label: 'Набор участников', color: 'yellow' },
   active: { label: 'Тур запущен', color: 'blue' },

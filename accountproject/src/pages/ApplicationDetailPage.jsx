@@ -1,6 +1,7 @@
 // src/pages/ApplicationDetailPage.jsx
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
+import { useToast } from '../context/ToastContext';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Button, Badge, StatusBadge, Modal, Textarea,
@@ -14,6 +15,7 @@ const GROUP_STEPS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 export default function ApplicationDetailPage() {
   const store = useStore();
+  const toast = useToast();
   const { id } = useParams();
   const navigate = useNavigate();
   const user = store.currentUser;
@@ -39,16 +41,26 @@ export default function ApplicationDetailPage() {
 
   const closeModal = () => { setModal(null); setNote(''); setDraftFile(''); setFinalDocs({ conclusionUrl: '', reportUrl: '', certificateUrl: '' }); };
 
-  const doAccept = () => { store.acceptApplication(app.id, user.id, note).catch(() => {}); closeModal(); };
-  const doReject = () => { if (!note.trim()) return; store.rejectApplication(app.id, user.id, note).catch(() => {}); closeModal(); };
-  const doAttachDraft = () => { if (!draftFile) return; store.attachDraftContract(app.id, user.id, draftFile).catch(() => {}); closeModal(); };
-  const doUploadSigned = fn => store.uploadSignedContract(app.id, user.id, fn).catch(() => {});
-  const doConfirmSamples = () => store.confirmSamplesReceived(app.id, user.id).catch(() => {});
-  const doUploadProtocol = fn => store.uploadProtocol(app.id, user.id, fn).catch(() => {});
-  const doProcessing = () => { store.setProcessingStatus(app.id, user.id, note).catch(() => {}); closeModal(); };
+  const runAction = async (fn, successMsg) => {
+    try {
+      await fn();
+      toast.success(successMsg);
+    } catch (e) {
+      toast.error(e?.message || 'Не удалось выполнить действие');
+      store.clearError();
+    }
+  };
+
+  const doAccept = () => { runAction(() => store.acceptApplication(app.id, user.id, note), `Заявка ${app.appNumber} принята`); closeModal(); };
+  const doReject = () => { if (!note.trim()) return; runAction(() => store.rejectApplication(app.id, user.id, note), `Заявка ${app.appNumber} отклонена`); closeModal(); };
+  const doAttachDraft = () => { if (!draftFile) return; runAction(() => store.attachDraftContract(app.id, user.id, draftFile), 'Драфт договора прикреплён'); closeModal(); };
+  const doUploadSigned = fn => runAction(() => store.uploadSignedContract(app.id, user.id, fn), 'Подписанный договор загружен');
+  const doConfirmSamples = () => runAction(() => store.confirmSamplesReceived(app.id, user.id), 'Получение образцов подтверждено');
+  const doUploadProtocol = fn => runAction(() => store.uploadProtocol(app.id, user.id, fn), 'Протокол испытаний прикреплён');
+  const doProcessing = () => { runAction(() => store.setProcessingStatus(app.id, user.id, note), 'Протокол принят в обработку'); closeModal(); };
   const doFinalDocs = () => {
     if (!finalDocs.conclusionUrl || !finalDocs.reportUrl || !finalDocs.certificateUrl) return;
-    store.uploadFinalDocuments(app.id, user.id, finalDocs).catch(() => {});
+    runAction(() => store.uploadFinalDocuments(app.id, user.id, finalDocs), 'Итоговые документы отправлены клиенту');
     closeModal();
   };
 
@@ -63,7 +75,7 @@ export default function ApplicationDetailPage() {
           <div>
             <div className="detail-header__number">
               {app.appNumber}
-              {tour && (
+              {tour && user.role !== 'client' && (
                 <span
                   onClick={e => { e.stopPropagation(); navigate(`/tours/${tour.id}`); }}
                   style={{ marginLeft: '8px', cursor: 'pointer', color: 'var(--cyan)', fontWeight: 700 }}
@@ -79,17 +91,17 @@ export default function ApplicationDetailPage() {
           </div>
         </div>
         <div className="detail-header__badges">
-          <StatusBadge status={app.status} />
-          {isGroupStep && tour && <Badge color="cyan">Групповой этап</Badge>}
-          {!isGroupStep && step > 9 && <Badge color="purple">Индивидуальный этап</Badge>}
+          <StatusBadge status={app.status} role={user.role} />
+          {user.role !== 'client' && isGroupStep && tour && <Badge color="cyan">Групповой этап</Badge>}
+          {user.role !== 'client' && !isGroupStep && step > 9 && <Badge color="purple">Индивидуальный этап</Badge>}
         </div>
       </div>
 
       {/* Step tracker */}
-      <StepTracker currentStep={step} />
+      <StepTracker currentStep={step} viewerRole={user.role} />
 
-      {/* Tour context note */}
-      {tour && isGroupStep && (
+      {/* Tour context note (admin/manager only — clients never see tours) */}
+      {tour && user.role !== 'client' && isGroupStep && (
         <div style={{ background: 'var(--cyan-dim)', border: '1px solid rgba(56,189,248,0.25)', borderRadius: 'var(--radius-sm)', padding: '10px 14px', marginBottom: '14px', fontSize: '0.82rem', color: 'var(--cyan)', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span>🗂️</span>
           <span>Этапы 1–9 управляются на уровне тура <strong
@@ -186,8 +198,8 @@ export default function ApplicationDetailPage() {
         </SectionBox>
       )}
 
-      {/* Tour info */}
-      {tour && (
+      {/* Tour info (admin/manager only — clients never see tours) */}
+      {tour && user.role !== 'client' && (
         <SectionBox title="Тур" icon="🗂️">
           <InfoRow label="Номер тура" value={tour.tourNumber} />
           <InfoRow label="Статус тура" value={TOUR_STATUSES[tour.status]?.label || tour.status} />
@@ -246,7 +258,7 @@ export default function ApplicationDetailPage() {
 
       {/* Timeline */}
       <SectionBox title="История статусов" icon="🕐">
-        <Timeline items={[...app.timeline].reverse()} store={store} />
+        <Timeline items={[...app.timeline].reverse()} store={store} role={user.role} />
       </SectionBox>
 
       {/* MODALS */}

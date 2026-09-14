@@ -88,7 +88,7 @@ export default function ApplicationsPage() {
                     </div>
                   </div>
                   <div className="app-card__right">
-                    <StatusBadge status={app.status} />
+                    <StatusBadge status={app.status} role={user.role} />
                   </div>
                 </div>
               </div>
