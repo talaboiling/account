@@ -1,6 +1,7 @@
 // src/pages/ApplicationDetailPage.jsx
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
+import { useToast } from '../context/ToastContext';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Button, Badge, StatusBadge, Modal, Textarea,
@@ -14,6 +15,7 @@ const GROUP_STEPS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 export default function ApplicationDetailPage() {
   const store = useStore();
+  const toast = useToast();
   const { id } = useParams();
   const navigate = useNavigate();
   const user = store.currentUser;
@@ -39,16 +41,25 @@ export default function ApplicationDetailPage() {
 
   const closeModal = () => { setModal(null); setNote(''); setDraftFile(''); setFinalDocs({ conclusionUrl: '', reportUrl: '', certificateUrl: '' }); };
 
-  const doAccept = () => { store.acceptApplication(app.id, user.id, note); closeModal(); };
-  const doReject = () => { if (!note.trim()) return; store.rejectApplication(app.id, user.id, note); closeModal(); };
-  const doAttachDraft = () => { if (!draftFile) return; store.attachDraftContract(app.id, user.id, draftFile); closeModal(); };
-  const doUploadSigned = fn => store.uploadSignedContract(app.id, user.id, fn);
-  const doConfirmSamples = () => store.confirmSamplesReceived(app.id, user.id);
-  const doUploadProtocol = fn => store.uploadProtocol(app.id, user.id, fn);
-  const doProcessing = () => { store.setProcessingStatus(app.id, user.id, note); closeModal(); };
+  const runAction = (fn, successMsg) => {
+    try {
+      fn();
+      toast.success(successMsg);
+    } catch (e) {
+      toast.error(e?.message || 'Не удалось выполнить действие');
+    }
+  };
+
+  const doAccept = () => { runAction(() => store.acceptApplication(app.id, user.id, note), `Заявка ${app.appNumber} принята`); closeModal(); };
+  const doReject = () => { if (!note.trim()) return; runAction(() => store.rejectApplication(app.id, user.id, note), `Заявка ${app.appNumber} отклонена`); closeModal(); };
+  const doAttachDraft = () => { if (!draftFile) return; runAction(() => store.attachDraftContract(app.id, user.id, draftFile), 'Драфт договора прикреплён'); closeModal(); };
+  const doUploadSigned = fn => runAction(() => store.uploadSignedContract(app.id, user.id, fn), 'Подписанный договор загружен');
+  const doConfirmSamples = () => runAction(() => store.confirmSamplesReceived(app.id, user.id), 'Получение образцов подтверждено');
+  const doUploadProtocol = fn => runAction(() => store.uploadProtocol(app.id, user.id, fn), 'Протокол испытаний прикреплён');
+  const doProcessing = () => { runAction(() => store.setProcessingStatus(app.id, user.id, note), 'Протокол принят в обработку'); closeModal(); };
   const doFinalDocs = () => {
     if (!finalDocs.conclusionUrl || !finalDocs.reportUrl || !finalDocs.certificateUrl) return;
-    store.uploadFinalDocuments(app.id, user.id, finalDocs);
+    runAction(() => store.uploadFinalDocuments(app.id, user.id, finalDocs), 'Итоговые документы отправлены клиенту');
     closeModal();
   };
 

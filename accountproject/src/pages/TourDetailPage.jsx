@@ -1,6 +1,7 @@
 // src/pages/TourDetailPage.jsx
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
+import { useToast } from '../context/ToastContext';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Button, Badge, StatusBadge, Modal, Select, Textarea,
@@ -16,6 +17,7 @@ function TourBadge({ status }) {
 
 export default function TourDetailPage() {
   const store    = useStore();
+  const toast    = useToast();
   const { id }   = useParams();
   const navigate = useNavigate();
   const user     = store.currentUser;
@@ -39,19 +41,28 @@ export default function TourDetailPage() {
 
   const closeModal = () => { setModal(null); setNote(''); setManagerId(''); setTaskNote(''); };
 
+  const runAction = (fn, successMsg) => {
+    try {
+      fn();
+      toast.success(successMsg);
+    } catch (e) {
+      toast.error(e?.message || 'Не удалось выполнить действие');
+    }
+  };
+
   const doStart = () => {
     if (!managerId || !taskNote.trim()) return;
-    store.startTour(tour.id, user.id, managerId, taskNote);
+    runAction(() => store.startTour(tour.id, user.id, managerId, taskNote), `Тур ${tour.tourNumber} запущен`);
     closeModal();
   };
 
   const doWorkStatus = () => {
-    store.updateTourWorkStatus(tour.id, user.id, workStatus, note);
+    runAction(() => store.updateTourWorkStatus(tour.id, user.id, workStatus, note), 'Статус тура обновлён');
     closeModal();
   };
 
   const doSamplesSent = () => {
-    store.notifyTourSamplesSent(tour.id, user.id, note);
+    runAction(() => store.notifyTourSamplesSent(tour.id, user.id, note), 'Уведомление об образцах отправлено');
     closeModal();
   };
 

@@ -1,5 +1,5 @@
 // src/components/ui.jsx
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import '../styles/ui.css';
 import { getApplicationStatusLabel } from '../data/store';
 
@@ -13,7 +13,18 @@ export function Badge({ children, color = 'default', className = '' }) {
 
 export function StatusBadge({ status, role }) {
   const cfg = getApplicationStatusLabel(status, role);
-  return <Badge color={cfg.color}>{cfg.label}</Badge>;
+  const prevStatus = useRef(status);
+  const [flash, setFlash] = useState(false);
+
+  useEffect(() => {
+    if (prevStatus.current === status) return;
+    prevStatus.current = status;
+    setFlash(true);
+    const t = setTimeout(() => setFlash(false), 600);
+    return () => clearTimeout(t);
+  }, [status]);
+
+  return <Badge color={cfg.color} className={flash ? 'badge--flash' : ''}>{cfg.label}</Badge>;
 }
 
 export function Input({ label, id, error, className = '', ...props }) {

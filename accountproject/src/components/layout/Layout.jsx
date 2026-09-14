@@ -1,6 +1,7 @@
 // src/components/layout/Layout.jsx
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
+import { useToast } from '../../context/ToastContext';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Badge } from '../ui';
 import '../../styles/layout.css';
@@ -32,6 +33,7 @@ const ROLE_LABEL = { admin: 'Администратор', manager: 'Заведу
 
 export default function Layout({ children }) {
   const store = useStore();
+  const toast = useToast();
   const user = store.currentUser;
   const navigate = useNavigate();
   const location = useLocation();
@@ -68,13 +70,13 @@ export default function Layout({ children }) {
                 <span className="nav-link__icon">{item.icon}</span>
                 {item.label}
               </span>
-              {isNotif && unread > 0 && <Badge color="red" className="badge--xs">{unread}</Badge>}
+              {isNotif && unread > 0 && <Badge color="red" className="badge--xs badge--pulse">{unread}</Badge>}
             </Link>
           );
         })}
       </nav>
       <div className="sidebar__footer">
-        <button className="sidebar__logout" onClick={() => { store.logout(); navigate('/login'); }}>
+        <button className="sidebar__logout" onClick={() => { store.logout(); toast.clearAll(); navigate('/login'); }}>
           <span>🚪</span> Выйти
         </button>
       </div>

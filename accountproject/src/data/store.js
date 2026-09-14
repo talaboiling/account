@@ -306,6 +306,7 @@ class Store {
     this._transitionApp(appId, 'accepted', adminId, note);
     const app = this.getAppById(appId);
     this._notifyClient(app, 'status_changed', `Ваша заявка ${app.appNumber} принята.`);
+    this.notify();
   }
 
   // Step 3: Admin sends draft contract to individual client
@@ -315,6 +316,7 @@ class Store {
     app.draftContractUrl = filename;
     this._transitionApp(appId, 'draft_sent', adminId, '');
     this._notifyClient(app, 'draft_sent', `Прикреплён драфт договора по заявке ${app.appNumber}. Пожалуйста, ознакомьтесь и загрузите подписанный экземпляр.`);
+    this.notify();
   }
 
   // Step 4: Client uploads signed contract
@@ -324,6 +326,7 @@ class Store {
     app.signedContractUrl = filename;
     this._transitionApp(appId, 'signed', clientId, '');
     this._notifyAdmins('signed_contract', appId, `Клиент загрузил подписанный договор по заявке ${app.appNumber}`);
+    this.notify();
   }
 
   // ── TOUR-LEVEL ACTIONS (steps 5–9) ───────────────────────────────────
@@ -428,6 +431,7 @@ class Store {
     this._transitionApp(appId, 'processing', adminId, note);
     const app = this.getAppById(appId);
     this._notifyClient(app, 'status_changed', `По заявке ${app.appNumber}: протокол принят в обработку.${note ? ' ' + note : ''}`);
+    this.notify();
   }
 
   // Step 12: Admin uploads final docs (individual)
@@ -439,6 +443,7 @@ class Store {
     if (certificateUrl) app.certificateUrl = certificateUrl;
     this._transitionApp(appId, 'finished', adminId, '');
     this._notifyClient(app, 'finished', `По заявке ${app.appNumber} прикреплены заключение, отчёт и свидетельство. Процесс завершён.`);
+    this.notify();
   }
 
   // Reject individual application
@@ -451,6 +456,7 @@ class Store {
       if (tour) tour.applicationIds = tour.applicationIds.filter(id => id !== appId);
     }
     this._notifyClient(app, 'status_changed', `Заявка ${app.appNumber} отклонена: ${note}`);
+    this.notify();
   }
 
   // ── HELPERS ──────────────────────────────────────────────────────────
