@@ -144,19 +144,30 @@ export function SectionBox({ title, icon, children }) {
   );
 }
 
-// Simulated file upload — returns a fake filename
+// Keeps the picked file's actual bytes alive for the browser session (via
+// an object URL) instead of just remembering its name, so it can genuinely
+// be opened/downloaded later — by any role, since it's all one browser tab.
 export function FileUpload({ label, onUpload, accept = '.pdf,.doc,.docx', current }) {
+  const [pickedName, setPickedName] = useState('');
+
   const handleChange = e => {
     const file = e.target.files?.[0];
-    if (file) onUpload(file.name);
+    if (!file) return;
+    setPickedName(file.name);
+    onUpload(URL.createObjectURL(file));
   };
+
   return (
     <div className="field">
       {label && <span className="field__label">{label}</span>}
       {current && (
         <div className="file-row" style={{ marginBottom: '8px' }}>
           <span className="file-row__icon">📎</span>
-          <span className="file-row__name">{current}</span>
+          <span className="file-row__name">
+            {current.startsWith('blob:')
+              ? <a href={current} target="_blank" rel="noreferrer">{pickedName || 'Открыть файл'} ↗</a>
+              : current}
+          </span>
           <Badge color="green" className="file-row__badge">Загружен</Badge>
         </div>
       )}
@@ -168,6 +179,16 @@ export function FileUpload({ label, onUpload, accept = '.pdf,.doc,.docx', curren
       </label>
     </div>
   );
+}
+
+// Renders a stored document reference as a real, clickable link when it's a
+// session-uploaded file (an object URL), or as plain text for the
+// historical demo filenames baked into the seed data.
+export function FileLink({ value }) {
+  if (!value) return null;
+  return value.startsWith('blob:')
+    ? <a href={value} target="_blank" rel="noreferrer">Открыть файл ↗</a>
+    : <span>{value}</span>;
 }
 
 const STEPS_FULL = [
