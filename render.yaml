@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: labcontrol
+    runtime: docker
+    dockerfilePath: ./accountproject/Dockerfile
+    dockerContext: ./accountproject
+    branch: feat1
+    plan: starter
+    healthCheckPath: /api/health
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATA_DIR
+        value: /var/data/db
+      - key: UPLOAD_DIR
+        value: /var/data/uploads
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1

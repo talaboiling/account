@@ -1,10 +1,12 @@
 const path = require('path');
+const fs = require('fs');
 const crypto = require('crypto');
 const express = require('express');
 const multer = require('multer');
 const { requireAuth } = require('../auth');
 
-const UPLOAD_DIR = path.join(__dirname, '..', '..', 'uploads');
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', '..', 'uploads');
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 const ALLOWED_EXT = new Set(['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png']);
 
 const storage = multer.diskStorage({
@@ -38,4 +40,4 @@ router.post('/', requireAuth, (req, res) => {
   });
 });
 
-module.exports = router;
+module.exports = { router, UPLOAD_DIR };
