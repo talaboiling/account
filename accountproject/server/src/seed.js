@@ -57,10 +57,10 @@ const seedApplications = [
     createdAt: '2024-03-01T09:00:00Z', updatedAt: '2024-03-06T09:00:00Z',
     timeline: [
       { status: 'submitted', date: '2024-03-01T09:00:00Z', by: 'client-1', note: '' },
-      { status: 'accepted', date: '2024-03-02T10:00:00Z', by: 'admin-1', note: 'Принята. Включена в ТУР-2024-001.' },
+      { status: 'accepted', date: '2024-03-02T10:00:00Z', by: 'admin-1', note: 'Принята.' },
       { status: 'draft_sent', date: '2024-03-03T11:00:00Z', by: 'admin-1', note: '' },
       { status: 'signed', date: '2024-03-04T14:00:00Z', by: 'client-1', note: '' },
-      { status: 'active', date: '2024-03-06T09:00:00Z', by: 'admin-1', note: 'Тур ТУР-2024-001 запущен.' },
+      { status: 'active', date: '2024-03-06T09:00:00Z', by: 'admin-1', note: 'Начата организация тура ППК.' },
     ],
   },
   {
@@ -103,10 +103,10 @@ const seedApplications = [
     createdAt: '2024-03-01T10:00:00Z', updatedAt: '2024-03-06T09:00:00Z',
     timeline: [
       { status: 'submitted', date: '2024-03-01T10:00:00Z', by: 'client-3', note: '' },
-      { status: 'accepted', date: '2024-03-02T10:30:00Z', by: 'admin-1', note: 'Принята. Включена в ТУР-2024-001.' },
+      { status: 'accepted', date: '2024-03-02T10:30:00Z', by: 'admin-1', note: 'Принята.' },
       { status: 'draft_sent', date: '2024-03-03T11:30:00Z', by: 'admin-1', note: '' },
       { status: 'signed', date: '2024-03-05T09:00:00Z', by: 'client-3', note: '' },
-      { status: 'active', date: '2024-03-06T09:00:00Z', by: 'admin-1', note: 'Тур ТУР-2024-001 запущен.' },
+      { status: 'active', date: '2024-03-06T09:00:00Z', by: 'admin-1', note: 'Начата организация тура ППК.' },
     ],
   },
 ];
@@ -114,7 +114,9 @@ const seedApplications = [
 const seedNotifications = [
   { id: 'n1', type: 'app_submitted', targetIds: ['admin-1', 'admin-2'], relatedId: 'app-1', message: 'Новая заявка ЗАЯ-2024-001 от ТОО «АналитЛаб»', read: 1, createdAt: '2024-03-01T09:00:00Z' },
   { id: 'n2', type: 'app_submitted', targetIds: ['admin-1', 'admin-2'], relatedId: 'app-3', message: 'Новая заявка ЗАЯ-2024-003 от РГП «КазЛабСтандарт»', read: 1, createdAt: '2024-03-01T10:00:00Z' },
-  { id: 'n3', type: 'tour_started', targetIds: ['client-1', 'client-3', 'mgr-1'], relatedId: 'tour-1', message: 'Тур ТУР-2024-001 запущен. Программа: ДНК животного в пищевых продуктах.', read: 1, createdAt: '2024-03-06T09:00:00Z' },
+  { id: 'n3', type: 'tour_started', targetIds: ['mgr-1'], relatedId: 'tour-1', message: 'Тур ТУР-2024-001 запущен. Программа: ДНК животного в пищевых продуктах.', read: 1, createdAt: '2024-03-06T09:00:00Z' },
+  { id: 'n3a', type: 'status_changed', targetIds: ['client-1'], relatedId: 'app-1', message: 'Заявка ЗАЯ-2024-001: начат этап «Организация тура ППК».', read: 1, createdAt: '2024-03-06T09:00:00Z' },
+  { id: 'n3b', type: 'status_changed', targetIds: ['client-3'], relatedId: 'app-3', message: 'Заявка ЗАЯ-2024-003: начат этап «Организация тура ППК».', read: 1, createdAt: '2024-03-06T09:00:00Z' },
   { id: 'n4', type: 'app_submitted', targetIds: ['admin-1', 'admin-2'], relatedId: 'app-2', message: 'Новая заявка ЗАЯ-2024-002 от ИП Морозова С.Д.', read: 0, createdAt: '2024-03-10T14:00:00Z' },
 ];
 

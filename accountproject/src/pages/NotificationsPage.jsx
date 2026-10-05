@@ -30,7 +30,9 @@ export default function NotificationsPage() {
     store.markNotificationRead(n.id).catch(() => {});
     if (!n.relatedId) return;
     const app = store.applications.find(a => a.id === n.relatedId);
-    if (app) navigate(`/applications/${app.id}`);
+    if (app) { navigate(`/applications/${app.id}`); return; }
+    const tour = store.tours.find(t => t.id === n.relatedId);
+    if (tour) navigate(`/tours/${tour.id}`);
   };
 
   const fmt = date => {

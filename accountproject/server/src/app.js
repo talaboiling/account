@@ -8,13 +8,13 @@ const userRoutes = require('./routes/users');
 const applicationRoutes = require('./routes/applications');
 const tourRoutes = require('./routes/tours');
 const notificationRoutes = require('./routes/notifications');
-const uploadRoutes = require('./routes/uploads');
+const { router: uploadRoutes, UPLOAD_DIR } = require('./routes/uploads');
 
 const app = express();
 
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+app.use('/uploads', express.static(UPLOAD_DIR));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

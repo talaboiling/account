@@ -750,29 +750,30 @@
     margin-bottom: 20px;
 }
 
-.step-item--done .step-item__bubble {
+.step-item__bubble.step-item--done {
     background: var(--green-dim);
     border-color: var(--green);
     color: var(--green);
 }
 
-.step-item--active .step-item__bubble {
+.step-item__bubble.step-item--active {
     background: var(--accent);
     border-color: var(--accent);
     color: #fff;
+    animation: pulseGlow 1.8s ease-in-out infinite;
 }
 
-.step-item--future .step-item__bubble {
+.step-item__bubble.step-item--future {
     background: var(--bg-card2);
     border-color: var(--border);
     color: var(--text-dim);
 }
 
-.step-item--done .step-item__line {
+.step-item__line.step-item--done {
     background: var(--green);
 }
 
-.step-item--active .step-item__line {
+.step-item__line.step-item--active {
     background: var(--accent-dim);
 }
 

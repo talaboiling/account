@@ -22,7 +22,8 @@ function StatCard({ icon, label, value, color, sub }) {
 function AppMiniRow({ app, store, navigate }) {
   const prog = store.getProgramById(app.programId);
   const client = store.getUserById(app.clientId);
-  const tour = app.tourId ? store.getTourById(app.tourId) : null;
+  const role = store.currentUser.role;
+  const tour = role !== 'client' && app.tourId ? store.getTourById(app.tourId) : null;
   return (
     <div className="app-row-mini" onClick={() => navigate(`/applications/${app.id}`)}>
       <div className="app-row-mini__left">
@@ -34,7 +35,7 @@ function AppMiniRow({ app, store, navigate }) {
         {client && <span className="app-row-mini__org">{client.orgName || client.name}</span>}
       </div>
       <div className="app-row-mini__right">
-        <StatusBadge status={app.status} />
+        <StatusBadge status={app.status} role={role} />
       </div>
     </div>
   );
